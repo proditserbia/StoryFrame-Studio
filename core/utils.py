@@ -5,27 +5,58 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
+
+from core.models import VisualSegment
+
+# ---------------------------------------------------------------------------
+# Segmentation density presets
+# ---------------------------------------------------------------------------
+
+#: Mapping from density name to (min_words, max_words) thresholds.
+SEGMENTATION_DENSITY: dict[str, dict[str, int]] = {
+    "sparse": {"min_words": 50, "max_words": 150},
+    "balanced": {"min_words": 20, "max_words": 80},
+    "detailed": {"min_words": 10, "max_words": 40},
+}
 
 
 def split_script_into_segments(
-    text: str, min_words: int = 20, max_words: int = 80
+    text: str,
+    min_words: int = 20,
+    max_words: int = 80,
+    density: str = "balanced",
 ) -> list[str]:
-    """Split script text into narrative segments.
+    """Split script text into narration-aligned segments.
 
     Strategy (in order of preference):
     1. Split on blank lines (paragraph breaks).
-    2. If paragraphs are too long, further split at sentence boundaries.
+    2. If paragraphs are too long, further split at sentence boundaries,
+       respecting punctuation pauses (., !, ?) as natural break points.
     3. If paragraphs are too short, merge adjacent ones.
+
+    The ``density`` parameter provides convenient presets that override
+    ``min_words`` / ``max_words`` when supplied:
+
+    - ``'sparse'``   – fewer, longer segments (fewer visual changes).
+    - ``'balanced'`` – default pacing.
+    - ``'detailed'`` – many shorter segments (rapid visual changes).
 
     Args:
         text: Raw script text.
-        min_words: Minimum words per segment (for merging).
-        max_words: Maximum words per segment (for splitting).
+        min_words: Minimum words per segment (used for merging).
+        max_words: Maximum words per segment (used for splitting).
+        density: Density preset name.  When recognised, overrides
+            ``min_words`` / ``max_words``.
 
     Returns:
         List of segment strings.
     """
+    if density in SEGMENTATION_DENSITY:
+        preset = SEGMENTATION_DENSITY[density]
+        min_words = preset["min_words"]
+        max_words = preset["max_words"]
+
     # Normalise line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -38,7 +69,7 @@ def split_script_into_segments(
         if len(words) <= max_words:
             segments.append(para)
         else:
-            # Split long paragraphs at sentence boundaries
+            # Split long paragraphs at sentence boundaries (natural pauses)
             sentences = re.split(r"(?<=[.!?])\s+", para)
             current: list[str] = []
             current_count = 0
@@ -65,6 +96,53 @@ def split_script_into_segments(
     return merged if merged else [text.strip()]
 
 
+def create_visual_plan(
+    segment_texts: list[str],
+    words_per_minute: int = 130,
+) -> List[VisualSegment]:
+    """Build a narration-aligned visual plan from a list of segment texts.
+
+    Each segment receives an estimated start and end time computed
+    cumulatively from its word count, using a words-per-minute heuristic.
+
+    Args:
+        segment_texts: Ordered list of narration segment strings.
+        words_per_minute: Average narration speed (default: 130 wpm).
+
+    Returns:
+        Ordered list of :class:`VisualSegment` objects with timing filled in.
+    """
+    visual_plan: List[VisualSegment] = []
+    start_time = 0.0
+    for i, text in enumerate(segment_texts):
+        duration = estimate_duration(text, words_per_minute)
+        end_time = start_time + duration
+        seg = VisualSegment(
+            index=i,
+            text=text,
+            estimated_start=start_time,
+            estimated_end=end_time,
+            estimated_duration=duration,
+        )
+        visual_plan.append(seg)
+        start_time = end_time
+    return visual_plan
+
+
+def format_time(seconds: float) -> str:
+    """Format a time in seconds as MM:SS for display in log messages.
+
+    Args:
+        seconds: Time in seconds.
+
+    Returns:
+        String formatted as ``MM:SS``.
+    """
+    m = int(seconds) // 60
+    s = int(seconds) % 60
+    return f"{m:02d}:{s:02d}"
+
+
 def estimate_duration(text: str, words_per_minute: int = 130) -> float:
     """Estimate narration duration from word count.
 
@@ -82,19 +160,21 @@ def estimate_duration(text: str, words_per_minute: int = 130) -> float:
 def build_image_prompt(
     segment_text: str, image_instructions: str, index: int
 ) -> str:
-    """Combine segment text and image instructions into an image prompt.
+    """Combine segment text and image style instructions into an image prompt.
+
+    The prompt is always grounded in the *actual narration text* of the
+    segment so that each generated image closely matches what is being
+    described in the voiceover at that moment.
 
     Args:
-        segment_text: Text of the script segment.
-        image_instructions: Content of prompts/images/images.txt.
-        index: Segment index (used for uniqueness hint).
+        segment_text: Text of the narration segment for this scene.
+        image_instructions: Content of ``prompts/images/images.txt``.
+        index: Segment index (zero-based).
 
     Returns:
         A formatted image generation prompt string.
     """
     instructions = image_instructions.strip()
-    # Summarise the segment text into a visual scene description
-    # In a full version this could call an LLM rewriter module.
     scene = segment_text.strip().replace("\n", " ")
     prompt = (
         f"Scene {index + 1}: {scene}\n\n"

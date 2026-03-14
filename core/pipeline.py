@@ -2,11 +2,12 @@
 
 Orchestrates:
 1. Config validation
-2. Script loading and segmentation
-3. TTS narration generation
-4. Image prompt building and image generation
-5. Video rendering via FFmpeg
-6. Metadata output
+2. Script loading
+3. Narration-aligned segmentation and visual planning
+4. TTS narration generation
+5. Per-segment image prompt building and image generation
+6. Video rendering via FFmpeg with per-segment durations
+7. Metadata output
 
 The pipeline is designed to be called from a background thread.
 """
@@ -17,16 +18,17 @@ import json
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
-from core.config import Config, ConfigError
+from core.config import Config
 from core.ffmpeg_renderer import FFmpegRenderer
 from core.logger import AppLogger
-from core.models import ImageResult, RunMetadata, ScriptSegment, TTSResult
+from core.models import ImageResult, RunMetadata, VisualSegment, TTSResult
 from core.utils import (
     build_image_prompt,
+    create_visual_plan,
     ensure_dir,
-    estimate_duration,
+    format_time,
     get_audio_duration,
     split_script_into_segments,
 )
@@ -51,8 +53,8 @@ class Pipeline:
     STEPS = [
         ("Loading config", 5),
         ("Reading script", 10),
-        ("Generating narration", 30),
-        ("Building image prompts", 45),
+        ("Creating visual plan", 20),
+        ("Generating narration", 35),
         ("Generating images", 75),
         ("Rendering video", 95),
         ("Done", 100),
@@ -79,6 +81,7 @@ class Pipeline:
         script_path: Path,
         image_instructions_path: Path,
         tts_provider_name: str,
+        segmentation_density: str = "balanced",
     ) -> RunMetadata:
         """Execute the full pipeline.
 
@@ -86,6 +89,8 @@ class Pipeline:
             script_path: Path to the script text file.
             image_instructions_path: Path to the image instructions file.
             tts_provider_name: Selected TTS provider ('elevenlabs' or 'deepgram').
+            segmentation_density: Segmentation density preset --
+                'sparse', 'balanced', or 'detailed'.
 
         Returns:
             RunMetadata with the results of the run.
@@ -101,6 +106,7 @@ class Pipeline:
             tts_provider=tts_provider_name,
             image_provider=self._config.image_provider,
             video_provider=self._config.video_provider,
+            segmentation_density=segmentation_density,
         )
 
         try:
@@ -111,6 +117,7 @@ class Pipeline:
                 script_path,
                 image_instructions_path,
                 tts_provider_name,
+                segmentation_density,
                 metadata,
             )
         except Exception as exc:
@@ -138,15 +145,16 @@ class Pipeline:
         script_path: Path,
         image_instructions_path: Path,
         tts_provider_name: str,
+        segmentation_density: str,
         metadata: RunMetadata,
     ) -> None:
-        # 1 – Validate config
+        # 1 -- Validate config
         self._report("Loading config", 5)
         self._config.validate(tts_override=tts_provider_name)
         self._logger.info("Config validated for provider: %s", tts_provider_name)
         self._check_cancel()
 
-        # 2 – Load files
+        # 2 -- Load files
         self._report("Reading script", 10)
         script_text = self._load_text(script_path, "script")
         image_instructions = self._load_text(
@@ -154,25 +162,49 @@ class Pipeline:
         )
         self._check_cancel()
 
-        # 3 – Segment script
-        raw_segments = split_script_into_segments(script_text)
-        segments = [
-            ScriptSegment(
-                index=i,
-                text=s,
-                estimated_duration=estimate_duration(s),
+        # 3 -- Segment script and create visual plan
+        self._report("Creating visual plan", 20)
+        self._logger.info(
+            "Segmenting script with density='%s'...", segmentation_density
+        )
+        raw_segments = split_script_into_segments(
+            script_text, density=segmentation_density
+        )
+        visual_plan: List[VisualSegment] = create_visual_plan(raw_segments)
+        metadata.segments = len(visual_plan)
+
+        self._logger.info(
+            "Visual plan: %d segments, total estimated %.1fs",
+            len(visual_plan),
+            sum(s.estimated_duration for s in visual_plan),
+        )
+        for seg in visual_plan:
+            preview = seg.text[:60].replace("\n", " ")
+            self._logger.info(
+                '[Segment %02d] %s - %s | "%s..."',
+                seg.index + 1,
+                format_time(seg.estimated_start),
+                format_time(seg.estimated_end),
+                preview,
             )
-            for i, s in enumerate(raw_segments)
-        ]
-        metadata.segments = len(segments)
-        self._logger.info("Script split into %d segments.", len(segments))
         self._check_cancel()
 
-        # 4 – TTS narration
-        self._report("Generating narration", 30)
+        # 4 -- Build image prompts (segment-specific, based on narration text)
+        for seg in visual_plan:
+            seg.image_prompt = build_image_prompt(
+                seg.text, image_instructions, seg.index
+            )
+            self._logger.info(
+                "[Prompt %02d] Generated image prompt based on segment text",
+                seg.index + 1,
+            )
+        self._check_cancel()
+
+        # 5 -- TTS narration
+        self._report("Generating narration", 35)
         tts_provider = self._get_tts_provider(tts_provider_name)
         audio_path = temp_dir / "narration.mp3"
-        full_script = " ".join(s.text for s in segments)
+        full_script = " ".join(s.text for s in visual_plan)
         tts_result: TTSResult = tts_provider.synthesize(full_script, audio_path)
         metadata.tts_result = {
             "audio_path": str(tts_result.audio_path),
@@ -181,67 +213,91 @@ class Pipeline:
         }
         self._logger.info("Narration saved to: %s", tts_result.audio_path)
 
-        # Refine audio duration from file if available
+        # Refine timing: if actual audio duration is available, scale segment
+        # durations proportionally so they span the exact audio length.
         actual_duration = get_audio_duration(
             self._config.ffprobe_path, tts_result.audio_path
         )
-        if actual_duration:
-            self._logger.info("Audio duration: %.1fs", actual_duration)
+        if actual_duration and actual_duration > 0:
+            self._logger.info("Actual audio duration: %.1fs", actual_duration)
+            total_estimated = sum(s.estimated_duration for s in visual_plan)
+            if total_estimated > 0:
+                scale = actual_duration / total_estimated
+                cumulative = 0.0
+                for seg in visual_plan:
+                    seg.estimated_duration = seg.estimated_duration * scale
+                    seg.estimated_start = cumulative
+                    seg.estimated_end = cumulative + seg.estimated_duration
+                    cumulative += seg.estimated_duration
+                self._logger.info(
+                    "Segment durations scaled by %.3f to match actual audio.", scale
+                )
+        else:
+            self._logger.info(
+                "Audio duration unavailable; using estimated segment timing."
+            )
         self._check_cancel()
 
-        # 5 – Build image prompts
-        self._report("Building image prompts", 45)
-        for seg in segments:
-            seg.image_prompt = build_image_prompt(
-                seg.text, image_instructions, seg.index
-            )
-            self._logger.debug(
-                "Prompt %d: %s...", seg.index, seg.image_prompt[:60]
-            )
-        self._check_cancel()
+        # Save visual plan to metadata (after timing refinement)
+        metadata.visual_plan = [s.to_dict() for s in visual_plan]
 
-        # 6 – Generate images
-        self._report("Generating images", 75)
+        # 6 -- Generate images (one per segment)
+        self._report("Generating images", 45)
         image_provider = self._get_image_provider()
         images_dir = ensure_dir(temp_dir / "images")
         image_results: list[ImageResult] = []
 
-        for i, seg in enumerate(segments):
+        total_segs = len(visual_plan)
+        for seg in visual_plan:
             self._check_cancel()
-            img_path = images_dir / f"scene_{i:04d}.png"
+            img_path = images_dir / f"scene_{seg.index:04d}.png"
             self._logger.info(
-                "Generating image %d/%d...", i + 1, len(segments)
+                "Generating image %d/%d...",
+                seg.index + 1,
+                total_segs,
             )
             img_result = image_provider.generate(
-                seg.image_prompt, img_path, segment_index=i
+                seg.image_prompt, img_path, segment_index=seg.index
             )
             image_results.append(img_result)
             metadata.image_results.append(
                 {
-                    "segment_index": i,
+                    "segment_index": seg.index,
                     "image_path": str(img_result.image_path),
                     "prompt": img_result.prompt[:120],
                     "provider": img_result.provider,
                 }
             )
+            pct = 45 + int(((seg.index + 1) / total_segs) * 29)
+            self._progress(
+                f"Generating image {seg.index + 1}/{total_segs}", pct
+            )
 
         self._check_cancel()
 
-        # 7 – Render video
-        self._report("Rendering video", 95)
+        # 7 -- Render video with per-segment durations
+        self._report("Rendering video", 76)
         output_video = run_dir / f"output_{run_id}.mp4"
         renderer = FFmpegRenderer(
             self._config, self._logger, cancel_event=self._cancel
         )
 
+        segment_durations = [s.estimated_duration for s in visual_plan]
+
+        for seg, dur in zip(visual_plan, segment_durations):
+            self._logger.info(
+                "[Render %02d] Using duration %.1fs", seg.index + 1, dur
+            )
+
         def render_progress(current: int, total: int) -> None:
-            pct = 75 + int((current / total) * 20)
+            pct = 76 + int((current / total) * 20)
             self._progress(f"Rendering clip {current}/{total}", pct)
 
         renderer.render(
             audio_path=tts_result.audio_path,
             image_results=image_results,
             output_path=output_video,
+            segment_durations=segment_durations,
             progress_callback=render_progress,
         )
 
