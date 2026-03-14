@@ -1,0 +1,331 @@
+"""Main processing pipeline for StoryFrame Studio.
+
+Orchestrates:
+1. Config validation
+2. Script loading and segmentation
+3. TTS narration generation
+4. Image prompt building and image generation
+5. Video rendering via FFmpeg
+6. Metadata output
+
+The pipeline is designed to be called from a background thread.
+"""
+
+from __future__ import annotations
+
+import json
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Optional
+
+from core.config import Config, ConfigError
+from core.ffmpeg_renderer import FFmpegRenderer
+from core.logger import AppLogger
+from core.models import ImageResult, RunMetadata, ScriptSegment, TTSResult
+from core.utils import (
+    build_image_prompt,
+    ensure_dir,
+    estimate_duration,
+    get_audio_duration,
+    split_script_into_segments,
+)
+from providers.image_base import ImageProviderBase
+from providers.tts_base import TTSProviderBase
+
+
+class PipelineError(Exception):
+    """Raised for recoverable pipeline failures."""
+
+
+class Pipeline:
+    """Full processing pipeline from script to final video.
+
+    Args:
+        config: Application configuration.
+        logger: Logger instance (with UI callback already attached).
+        cancel_event: Set this event to cancel the running pipeline.
+        progress_callback: Called with (step_label, percent_complete).
+    """
+
+    STEPS = [
+        ("Loading config", 5),
+        ("Reading script", 10),
+        ("Generating narration", 30),
+        ("Building image prompts", 45),
+        ("Generating images", 75),
+        ("Rendering video", 95),
+        ("Done", 100),
+    ]
+
+    def __init__(
+        self,
+        config: Config,
+        logger: AppLogger,
+        cancel_event: Optional[threading.Event] = None,
+        progress_callback: Optional[Callable[[str, int], None]] = None,
+    ) -> None:
+        self._config = config
+        self._logger = logger
+        self._cancel = cancel_event or threading.Event()
+        self._progress = progress_callback or (lambda label, pct: None)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def run(
+        self,
+        script_path: Path,
+        image_instructions_path: Path,
+        tts_provider_name: str,
+    ) -> RunMetadata:
+        """Execute the full pipeline.
+
+        Args:
+            script_path: Path to the script text file.
+            image_instructions_path: Path to the image instructions file.
+            tts_provider_name: Selected TTS provider ('elevenlabs' or 'deepgram').
+
+        Returns:
+            RunMetadata with the results of the run.
+        """
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = ensure_dir(self._config.output_dir / run_id)
+        temp_dir = ensure_dir(self._config.temp_dir / run_id)
+
+        metadata = RunMetadata(
+            run_id=run_id,
+            script_file=str(script_path),
+            image_instructions_file=str(image_instructions_path),
+            tts_provider=tts_provider_name,
+            image_provider=self._config.image_provider,
+            video_provider=self._config.video_provider,
+        )
+
+        try:
+            self._run_impl(
+                run_id,
+                run_dir,
+                temp_dir,
+                script_path,
+                image_instructions_path,
+                tts_provider_name,
+                metadata,
+            )
+        except Exception as exc:
+            if self._cancel.is_set():
+                self._logger.warning("Pipeline cancelled.")
+                metadata.error = "Cancelled by user."
+            else:
+                self._logger.exception("Pipeline error: %s", exc)
+                metadata.error = str(exc)
+            metadata.success = False
+
+        # Always write metadata
+        self._write_metadata(run_dir / "metadata.json", metadata)
+        return metadata
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _run_impl(
+        self,
+        run_id: str,
+        run_dir: Path,
+        temp_dir: Path,
+        script_path: Path,
+        image_instructions_path: Path,
+        tts_provider_name: str,
+        metadata: RunMetadata,
+    ) -> None:
+        # 1 – Validate config
+        self._report("Loading config", 5)
+        self._config.validate(tts_override=tts_provider_name)
+        self._logger.info("Config validated for provider: %s", tts_provider_name)
+        self._check_cancel()
+
+        # 2 – Load files
+        self._report("Reading script", 10)
+        script_text = self._load_text(script_path, "script")
+        image_instructions = self._load_text(
+            image_instructions_path, "image instructions"
+        )
+        self._check_cancel()
+
+        # 3 – Segment script
+        raw_segments = split_script_into_segments(script_text)
+        segments = [
+            ScriptSegment(
+                index=i,
+                text=s,
+                estimated_duration=estimate_duration(s),
+            )
+            for i, s in enumerate(raw_segments)
+        ]
+        metadata.segments = len(segments)
+        self._logger.info("Script split into %d segments.", len(segments))
+        self._check_cancel()
+
+        # 4 – TTS narration
+        self._report("Generating narration", 30)
+        tts_provider = self._get_tts_provider(tts_provider_name)
+        audio_path = temp_dir / "narration.mp3"
+        full_script = " ".join(s.text for s in segments)
+        tts_result: TTSResult = tts_provider.synthesize(full_script, audio_path)
+        metadata.tts_result = {
+            "audio_path": str(tts_result.audio_path),
+            "duration_seconds": tts_result.duration_seconds,
+            "provider": tts_result.provider,
+        }
+        self._logger.info("Narration saved to: %s", tts_result.audio_path)
+
+        # Refine audio duration from file if available
+        actual_duration = get_audio_duration(
+            self._config.ffprobe_path, tts_result.audio_path
+        )
+        if actual_duration:
+            self._logger.info("Audio duration: %.1fs", actual_duration)
+        self._check_cancel()
+
+        # 5 – Build image prompts
+        self._report("Building image prompts", 45)
+        for seg in segments:
+            seg.image_prompt = build_image_prompt(
+                seg.text, image_instructions, seg.index
+            )
+            self._logger.debug(
+                "Prompt %d: %s...", seg.index, seg.image_prompt[:60]
+            )
+        self._check_cancel()
+
+        # 6 – Generate images
+        self._report("Generating images", 75)
+        image_provider = self._get_image_provider()
+        images_dir = ensure_dir(temp_dir / "images")
+        image_results: list[ImageResult] = []
+
+        for i, seg in enumerate(segments):
+            self._check_cancel()
+            img_path = images_dir / f"scene_{i:04d}.png"
+            self._logger.info(
+                "Generating image %d/%d...", i + 1, len(segments)
+            )
+            img_result = image_provider.generate(
+                seg.image_prompt, img_path, segment_index=i
+            )
+            image_results.append(img_result)
+            metadata.image_results.append(
+                {
+                    "segment_index": i,
+                    "image_path": str(img_result.image_path),
+                    "prompt": img_result.prompt[:120],
+                    "provider": img_result.provider,
+                }
+            )
+
+        self._check_cancel()
+
+        # 7 – Render video
+        self._report("Rendering video", 95)
+        output_video = run_dir / f"output_{run_id}.mp4"
+        renderer = FFmpegRenderer(
+            self._config, self._logger, cancel_event=self._cancel
+        )
+
+        def render_progress(current: int, total: int) -> None:
+            pct = 75 + int((current / total) * 20)
+            self._progress(f"Rendering clip {current}/{total}", pct)
+
+        renderer.render(
+            audio_path=tts_result.audio_path,
+            image_results=image_results,
+            output_path=output_video,
+            progress_callback=render_progress,
+        )
+
+        metadata.output_video = str(output_video)
+        metadata.success = True
+        self._report("Done", 100)
+        self._logger.info("Pipeline complete. Output: %s", output_video)
+
+    def _check_cancel(self) -> None:
+        """Raise PipelineError if cancellation was requested."""
+        if self._cancel.is_set():
+            raise PipelineError("Cancelled by user.")
+
+    def _report(self, label: str, pct: int) -> None:
+        """Forward progress update."""
+        self._logger.info("[%d%%] %s", pct, label)
+        self._progress(label, pct)
+
+    def _load_text(self, path: Path, label: str) -> str:
+        """Load text file content.
+
+        Args:
+            path: File path.
+            label: Human-readable label for error messages.
+
+        Returns:
+            File content as string.
+
+        Raises:
+            PipelineError: If the file cannot be read.
+        """
+        self._logger.info("Loading %s: %s", label, path)
+        if not path.exists():
+            raise PipelineError(f"{label.capitalize()} file not found: {path}")
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise PipelineError(f"Could not read {label} file: {exc}") from exc
+
+    def _get_tts_provider(self, name: str) -> "TTSProviderBase":
+        """Instantiate the requested TTS provider.
+
+        Args:
+            name: Provider name ('elevenlabs' or 'deepgram').
+
+        Returns:
+            A TTS provider instance.
+        """
+        name = name.lower().strip()
+        if name == "elevenlabs":
+            from providers.elevenlabs_tts import ElevenLabsTTSProvider
+            return ElevenLabsTTSProvider(self._config, self._logger)
+        elif name == "deepgram":
+            from providers.deepgram_tts import DeepgramTTSProvider
+            return DeepgramTTSProvider(self._config, self._logger)
+        else:
+            raise PipelineError(f"Unknown TTS provider: '{name}'")
+
+    def _get_image_provider(self) -> "ImageProviderBase":
+        """Instantiate the configured image provider.
+
+        Returns:
+            An image provider instance.
+        """
+        name = self._config.image_provider.lower().strip()
+        if name == "replicate":
+            from providers.replicate_image import ReplicateImageProvider
+            return ReplicateImageProvider(self._config, self._logger)
+        else:
+            raise PipelineError(f"Unknown image provider: '{name}'")
+
+    @staticmethod
+    def _write_metadata(path: Path, metadata: RunMetadata) -> None:
+        """Serialise metadata to JSON.
+
+        Args:
+            path: Destination file path.
+            metadata: RunMetadata instance.
+        """
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(metadata.to_dict(), indent=2, default=str),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass  # Non-fatal

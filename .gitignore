@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App outputs – keep folder structure but ignore generated content
+projects/output/*/
+projects/temp/*/
+
+# Logs
+*.log
+
+# Distribution
+*.whl
+*.tar.gz

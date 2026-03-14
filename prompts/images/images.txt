@@ -1,0 +1,25 @@
+# Image Generation Style Instructions
+# ─────────────────────────────────────────────────────────────────────────────
+# Edit this file to define the visual style for your project.
+# These instructions are combined with each script segment to produce
+# image generation prompts sent to the AI image provider.
+#
+# You can describe:
+#  - Art style (photorealistic, illustrated, cinematic, etc.)
+#  - Mood and atmosphere (dark, dramatic, hopeful, etc.)
+#  - Lighting preferences
+#  - Camera angle or perspective
+#  - What to include or exclude
+#  - Color palette
+# ─────────────────────────────────────────────────────────────────────────────
+
+Cinematic photorealistic style.
+Dramatic, high-contrast lighting with rich shadows.
+Ultra-detailed environment, 8K quality.
+No text overlays, watermarks, or logos in the image.
+No extra human figures unless the script explicitly describes people.
+Atmospheric depth-of-field, realistic textures.
+Color palette: deep blues, warm ambers, and muted earth tones.
+Wide-angle establishing shots where appropriate.
+Mood: mysterious, immersive, story-driven.
+Avoid cartoon or anime aesthetics.
