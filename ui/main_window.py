@@ -43,6 +43,11 @@ _IMAGE_PRESETS = {
     "Standard (8s)": 8.0,
     "Long (12s)": 12.0,
 }
+_DENSITY_OPTIONS = {
+    "Sparse (fewer scenes)": "sparse",
+    "Balanced": "balanced",
+    "Detailed (more scenes)": "detailed",
+}
 
 
 class MainWindow:
@@ -131,6 +136,19 @@ class MainWindow:
             state="readonly",
             width=20,
         ).grid(row=3, column=1, sticky=tk.W, **pad)
+
+        # Segmentation density
+        ttk.Label(ctrl, text="Segmentation:").grid(
+            row=4, column=0, sticky=tk.W, **pad
+        )
+        self._density_var = StringVar(value="Balanced")
+        ttk.Combobox(
+            ctrl,
+            textvariable=self._density_var,
+            values=list(_DENSITY_OPTIONS.keys()),
+            state="readonly",
+            width=24,
+        ).grid(row=4, column=1, sticky=tk.W, **pad)
 
         # ── Action buttons ─────────────────────────────────────────────
         btn_frame = ttk.Frame(self._root)
@@ -249,6 +267,10 @@ class MainWindow:
             preset_label, self._config.image_duration_seconds
         )
 
+        # Resolve segmentation density
+        density_label = self._density_var.get()
+        density = _DENSITY_OPTIONS.get(density_label, "balanced")
+
         # Disable Start, enable Cancel
         self._start_btn.config(state=tk.DISABLED)
         self._cancel_btn.config(state=tk.NORMAL)
@@ -262,6 +284,7 @@ class MainWindow:
             script_path=script,
             image_instructions_path=images,
             tts_provider_name=self._tts_var.get(),
+            segmentation_density=density,
         )
 
     def _on_cancel(self) -> None:

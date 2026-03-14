@@ -81,12 +81,15 @@ class FFmpegRenderer:
         audio_path: Path,
         image_results: List[ImageResult],
         output_path: Path,
+        segment_durations: Optional[List[float]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Path:
         """Render the final video.
 
         Pipeline:
-        1. For each image, generate a short video clip with Ken Burns effect.
+        1. For each image, generate a short video clip with Ken Burns effect,
+           using the per-segment duration from ``segment_durations`` when
+           provided, falling back to the global ``IMAGE_DURATION_SECONDS``.
         2. Concatenate clips with optional crossfades.
         3. Mix in narration audio and produce final MP4.
 
@@ -94,6 +97,10 @@ class FFmpegRenderer:
             audio_path: Path to the narration audio file.
             image_results: Ordered list of image generation results.
             output_path: Destination path for the output MP4.
+            segment_durations: Per-segment durations in seconds.  When
+                provided, each clip uses its own duration from this list.
+                Falls back to ``config.image_duration_seconds`` for any
+                missing entry.
             progress_callback: Called with (current_step, total_steps).
 
         Returns:
@@ -109,7 +116,7 @@ class FFmpegRenderer:
         encoder = self._encoder()
         width, height = self._config.resolution_tuple
         fps = self._config.default_fps
-        duration = self._config.image_duration_seconds
+        fallback_duration = self._config.image_duration_seconds
         crossfade = self._config.crossfade_duration
 
         self._logger.info(
@@ -122,12 +129,19 @@ class FFmpegRenderer:
         )
 
         clip_paths: list[Path] = []
+        clip_durations: list[float] = []
         total = len(image_results)
 
         # --- Step 1: generate per-image clips ---
         for i, img_result in enumerate(image_results):
             if self._cancel.is_set():
                 raise RuntimeError("Rendering cancelled by user.")
+
+            # Use per-segment duration if available, otherwise fall back
+            if segment_durations and i < len(segment_durations):
+                duration = segment_durations[i]
+            else:
+                duration = fallback_duration
 
             clip_path = output_path.parent / f"_clip_{i:04d}.mp4"
             self._generate_clip(
@@ -141,16 +155,20 @@ class FFmpegRenderer:
                 zoom_style=self._config.zoom_style,
             )
             clip_paths.append(clip_path)
+            clip_durations.append(duration)
             if progress_callback:
                 progress_callback(i + 1, total)
-            self._logger.info("  Clip %d/%d rendered.", i + 1, total)
+            self._logger.info("  Clip %d/%d rendered (%.1fs).", i + 1, total, duration)
 
         if self._cancel.is_set():
             raise RuntimeError("Rendering cancelled by user.")
 
         # --- Step 2: concatenate clips ---
         concat_path = output_path.parent / "_concat.mp4"
-        self._concatenate_clips(clip_paths, concat_path, crossfade=crossfade)
+        self._concatenate_clips(
+            clip_paths, concat_path, crossfade=crossfade,
+            clip_durations=clip_durations,
+        )
 
         if self._cancel.is_set():
             raise RuntimeError("Rendering cancelled by user.")
@@ -260,7 +278,11 @@ class FFmpegRenderer:
         self._run_ffmpeg(cmd, f"clip_{output.stem}")
 
     def _concatenate_clips(
-        self, clip_paths: list[Path], output: Path, crossfade: float
+        self,
+        clip_paths: list[Path],
+        output: Path,
+        crossfade: float,
+        clip_durations: Optional[List[float]] = None,
     ) -> None:
         """Concatenate video clips, with optional crossfade transitions.
 
@@ -268,6 +290,8 @@ class FFmpegRenderer:
             clip_paths: Ordered list of clip paths.
             output: Destination path.
             crossfade: Crossfade duration in seconds (0 = no crossfade).
+            clip_durations: Per-clip durations used to compute xfade offsets.
+                Falls back to ``config.image_duration_seconds`` when absent.
         """
         if len(clip_paths) == 1:
             # Single clip – just copy
@@ -285,15 +309,20 @@ class FFmpegRenderer:
         n = len(clip_paths)
         filter_parts: list[str] = []
         prev = "[0:v]"
-        # Each clip's duration (approximate – we'll use image_duration_seconds)
-        clip_dur = self._config.image_duration_seconds
 
+        cumulative_offset = 0.0
         for i in range(1, n):
-            offset = i * clip_dur - crossfade * i
+            # Use the actual duration of the preceding clip for the offset
+            if clip_durations and (i - 1) < len(clip_durations):
+                clip_dur = clip_durations[i - 1]
+            else:
+                clip_dur = self._config.image_duration_seconds
+            cumulative_offset += clip_dur - crossfade
+            offset = max(cumulative_offset, 0)
             out_label = f"[xf{i}]" if i < n - 1 else "[vout]"
             filter_parts.append(
                 f"{prev}[{i}:v]xfade=transition=fade:duration={crossfade}"
-                f":offset={max(offset, 0)}{out_label}"
+                f":offset={offset}{out_label}"
             )
             prev = f"[xf{i}]"
 

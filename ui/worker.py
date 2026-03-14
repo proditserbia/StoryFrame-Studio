@@ -53,6 +53,7 @@ class PipelineWorker:
         script_path: Path,
         image_instructions_path: Path,
         tts_provider_name: str,
+        segmentation_density: str = "balanced",
         log_file: Optional[Path] = None,
     ) -> None:
         """Start the pipeline in a background thread.
@@ -61,13 +62,21 @@ class PipelineWorker:
             script_path: Path to the script text file.
             image_instructions_path: Path to the image instructions file.
             tts_provider_name: Selected TTS provider name.
+            segmentation_density: Density preset ('sparse', 'balanced',
+                or 'detailed').
             log_file: Optional path for persistent log file.
         """
         self._cancel_event.clear()
 
         self._thread = threading.Thread(
             target=self._run,
-            args=(script_path, image_instructions_path, tts_provider_name, log_file),
+            args=(
+                script_path,
+                image_instructions_path,
+                tts_provider_name,
+                segmentation_density,
+                log_file,
+            ),
             daemon=True,
             name="PipelineWorker",
         )
@@ -94,6 +103,7 @@ class PipelineWorker:
         script_path: Path,
         image_instructions_path: Path,
         tts_provider_name: str,
+        segmentation_density: str,
         log_file: Optional[Path],
     ) -> None:
         """Thread body: sets up logger, runs pipeline, posts result."""
@@ -122,6 +132,7 @@ class PipelineWorker:
                 script_path=script_path,
                 image_instructions_path=image_instructions_path,
                 tts_provider_name=tts_provider_name,
+                segmentation_density=segmentation_density,
             )
             if metadata.success:
                 self._queue.put(WorkerMessage("done", metadata))

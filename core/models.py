@@ -28,6 +28,47 @@ class ScriptSegment:
 
 
 @dataclass
+class VisualSegment:
+    """A narration-aligned visual segment used in the visual plan.
+
+    Each segment maps a slice of the narration text to one image/scene,
+    with timing derived from the estimated speech duration of that text.
+
+    Attributes:
+        index: Zero-based position in the visual plan.
+        text: The narration text for this segment.
+        estimated_start: Estimated start time in the final video (seconds).
+        estimated_end: Estimated end time in the final video (seconds).
+        estimated_duration: Estimated on-screen duration in seconds.
+        image_prompt: The image generation prompt for this segment.
+        transition_hint: Optional hint for the transition style (e.g. 'fade').
+        emphasis_keyword: Optional keyword that describes the visual focus.
+    """
+
+    index: int
+    text: str
+    estimated_start: float
+    estimated_end: float
+    estimated_duration: float
+    image_prompt: str = ""
+    transition_hint: str = ""
+    emphasis_keyword: str = ""
+
+    def to_dict(self) -> dict:
+        """Serialise to a plain dict suitable for JSON output."""
+        return {
+            "index": self.index,
+            "text": self.text,
+            "estimated_start": round(self.estimated_start, 2),
+            "estimated_end": round(self.estimated_end, 2),
+            "estimated_duration": round(self.estimated_duration, 2),
+            "image_prompt": self.image_prompt,
+            "transition_hint": self.transition_hint,
+            "emphasis_keyword": self.emphasis_keyword,
+        }
+
+
+@dataclass
 class TTSResult:
     """Result returned by a TTS provider after synthesis.
 
@@ -74,8 +115,10 @@ class RunMetadata:
         tts_provider: Name of the TTS provider used.
         image_provider: Name of the image provider used.
         video_provider: Name of the video provider used.
+        segmentation_density: Density preset used for segmentation.
         tts_result: TTS result metadata.
         image_results: List of image result metadata.
+        visual_plan: Serialised list of VisualSegment dicts.
         output_video: Path to the final rendered MP4.
         success: Whether the run completed successfully.
         error: Error message if unsuccessful.
@@ -88,8 +131,10 @@ class RunMetadata:
     tts_provider: str
     image_provider: str
     video_provider: str
+    segmentation_density: str = "balanced"
     tts_result: Optional[dict] = None
     image_results: List[dict] = field(default_factory=list)
+    visual_plan: List[dict] = field(default_factory=list)
     output_video: Optional[str] = None
     success: bool = False
     error: Optional[str] = None
@@ -104,8 +149,10 @@ class RunMetadata:
             "tts_provider": self.tts_provider,
             "image_provider": self.image_provider,
             "video_provider": self.video_provider,
+            "segmentation_density": self.segmentation_density,
             "tts_result": self.tts_result,
             "image_results": self.image_results,
+            "visual_plan": self.visual_plan,
             "output_video": self.output_video,
             "success": self.success,
             "error": self.error,
