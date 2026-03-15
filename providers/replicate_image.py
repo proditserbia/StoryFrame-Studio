@@ -9,11 +9,11 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import Any, Optional
-from urllib.request import urlretrieve
 
 import requests
 
 from core.config import Config
+from core.image_postprocess import normalize_to_16x9_png
 from core.logger import AppLogger
 from core.models import ImageResult
 from providers.image_base import ImageProviderBase
@@ -70,17 +70,26 @@ class ReplicateImageProvider(ImageProviderBase):
             "Content-Type": "application/json",
         }
 
+        # Hint the model towards 16:9 output where supported.
+        # 1344×768 is a common generation resolution for 16:9 diffusion models;
+        # the output is always upscaled to 2304×1296 by normalize_to_16x9_png.
+        _image_hint: dict[str, Any] = {
+            "aspect_ratio": "16:9",
+            "width": 1344,
+            "height": 768,
+        }
+
         # Determine endpoint – models with versions use /predictions
         if ":" in model_ref:
             owner_model, version = model_ref.split(":", 1)
             payload: dict[str, Any] = {
                 "version": version,
-                "input": {"prompt": prompt},
+                "input": {"prompt": prompt, **_image_hint},
             }
             url = f"{_API_BASE}/predictions"
         else:
             # Latest model version endpoint
-            payload = {"input": {"prompt": prompt}}
+            payload = {"input": {"prompt": prompt, **_image_hint}}
             url = f"{_API_BASE}/models/{model_ref}/predictions"
 
         self._logger.info(
@@ -99,12 +108,33 @@ class ReplicateImageProvider(ImageProviderBase):
         # Poll for completion
         image_url = self._poll_prediction(pred_id, headers)
 
-        # Download image
+        # Download raw image via requests into a temporary buffer
+        label = f"Image {segment_index + 1:02d}"
+        self._logger.info("Replicate: downloading raw image for %s", label)
+        img_resp = requests.get(image_url, timeout=_TIMEOUT)
+        if img_resp.status_code != 200:
+            raise RuntimeError(
+                f"Failed to download image (HTTP {img_resp.status_code})"
+            )
+
+        # Write raw bytes to a temp file so Pillow can open it reliably
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        self._logger.info(
-            "Replicate: downloading image to %s", output_path
+        raw_path = output_path.with_suffix(".raw_download")
+        raw_path.write_bytes(img_resp.content)
+
+        # Normalise to 2304×1296 RGB PNG
+        normalize_to_16x9_png(
+            raw_path=raw_path,
+            output_path=output_path,
+            label=label,
+            log=lambda msg: self._logger.info("%s", msg),
         )
-        urlretrieve(image_url, str(output_path))  # noqa: S310
+
+        # Remove the raw download temp file
+        try:
+            raw_path.unlink()
+        except OSError:
+            pass
 
         self._logger.info("Replicate: image saved – segment %d", segment_index)
         return ImageResult(
