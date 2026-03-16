@@ -38,6 +38,7 @@ class Config:
     elevenlabs_voice_id: Optional[str]
     deepgram_api_key: Optional[str]
     deepgram_voice_model: str
+    tts_leading_silence: float
 
     # --- Image ---
     image_provider: str
@@ -72,6 +73,10 @@ class Config:
         self.deepgram_api_key = os.getenv("DEEPGRAM_API_KEY") or None
         self.deepgram_voice_model = os.getenv(
             "DEEPGRAM_VOICE_MODEL", "aura-asteria-en"
+        )
+        # Seconds of silence to prepend before narration (0 = disabled).
+        self.tts_leading_silence = float(
+            os.getenv("TTS_LEADING_SILENCE_SECONDS", "0.0")
         )
 
         # Image
