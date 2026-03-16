@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import List, Optional
@@ -162,9 +163,10 @@ def build_image_prompt(
 ) -> str:
     """Combine segment text and image style instructions into an image prompt.
 
-    The prompt is always grounded in the *actual narration text* of the
-    segment so that each generated image closely matches what is being
-    described in the voiceover at that moment.
+    The global style rules from ``prompts/images/images.txt`` are placed as a
+    strong directive block at the top of the prompt so that the image model
+    treats them as mandatory constraints rather than optional trailing context.
+    The scene description follows, grounded in the actual narration text.
 
     Args:
         segment_text: Text of the narration segment for this scene.
@@ -177,8 +179,10 @@ def build_image_prompt(
     instructions = image_instructions.strip()
     scene = segment_text.strip().replace("\n", " ")
     prompt = (
-        f"Scene {index + 1}: {scene}\n\n"
-        f"Visual style and requirements:\n{instructions}"
+        f"Follow these visual rules strictly.\n\n"
+        f"GLOBAL STYLE RULES:\n{instructions}\n\n"
+        f"SCENE TO RENDER:\n"
+        f"Scene {index + 1}: {scene}"
     )
     return prompt
 
@@ -244,3 +248,48 @@ def get_audio_duration(
     except Exception:
         pass
     return None
+
+
+def prepend_silence(
+    ffmpeg_path: str,
+    audio_path: Path,
+    silence_seconds: float,
+    output_path: Path,
+) -> bool:
+    """Prepend a period of silence to an audio file using FFmpeg.
+
+    Uses the ``adelay`` filter to shift all audio channels by the requested
+    number of milliseconds, effectively inserting silence at the start.
+
+    Args:
+        ffmpeg_path: Path or name of the ffmpeg executable.
+        audio_path: Source audio file.
+        silence_seconds: Duration of silence to prepend in seconds.
+        output_path: Destination audio file path.
+
+    Returns:
+        True on success, False on error.
+    """
+    if silence_seconds <= 0:
+        shutil.copy(audio_path, output_path)
+        return True
+
+    delay_ms = int(silence_seconds * 1000)
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",
+                "-i", str(audio_path),
+                "-af", f"adelay=delays={delay_ms}:all=1",
+                "-c:a", "libmp3lame",
+                "-q:a", "2",
+                str(output_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False

@@ -30,6 +30,7 @@ from core.utils import (
     ensure_dir,
     format_time,
     get_audio_duration,
+    prepend_silence,
     split_script_into_segments,
 )
 from providers.image_base import ImageProviderBase
@@ -213,16 +214,70 @@ class Pipeline:
         }
         self._logger.info("Narration saved to: %s", tts_result.audio_path)
 
+        # Prepend configurable leading silence so narration does not start
+        # the very instant the video begins.
+        leading_silence = self._config.tts_leading_silence
+        if leading_silence > 0:
+            self._logger.info(
+                "[TTS] Prepending %.2fs of silence before narration.",
+                leading_silence,
+            )
+            silenced_path = temp_dir / "narration_with_silence.mp3"
+            if prepend_silence(
+                self._config.ffmpeg_path,
+                tts_result.audio_path,
+                leading_silence,
+                silenced_path,
+            ):
+                tts_result = TTSResult(
+                    audio_path=silenced_path,
+                    provider=tts_result.provider,
+                    metadata=tts_result.metadata,
+                )
+                self._logger.info(
+                    "[TTS] Silence prepended successfully. Audio: %s",
+                    silenced_path,
+                )
+            else:
+                self._logger.warning(
+                    "[TTS] Failed to prepend silence; using original audio."
+                )
+
         # Refine timing: if actual audio duration is available, scale segment
-        # durations proportionally so they span the exact audio length.
+        # durations proportionally so the total video spans the audio length
+        # plus the time consumed by xfade overlaps (each transition shortens
+        # the combined video by one crossfade_duration worth of frames, so we
+        # add that back to ensure the last narration sentence is not cut off).
         actual_duration = get_audio_duration(
             self._config.ffprobe_path, tts_result.audio_path
         )
         if actual_duration and actual_duration > 0:
-            self._logger.info("Actual audio duration: %.1fs", actual_duration)
+            segment_count = len(visual_plan)
+            crossfade = self._config.crossfade_duration
+            if segment_count > 1:
+                target_video_duration = (
+                    actual_duration + crossfade * (segment_count - 1)
+                )
+            else:
+                target_video_duration = actual_duration
+
+            self._logger.info(
+                "[Timing] Actual audio duration: %.2fs", actual_duration
+            )
+            self._logger.info(
+                "[Timing] Crossfade duration: %.2fs", crossfade
+            )
+            self._logger.info(
+                "[Timing] Segment count: %d", segment_count
+            )
+            self._logger.info(
+                "[Timing] Target video duration after xfade compensation: %.2fs",
+                target_video_duration,
+            )
+
             total_estimated = sum(s.estimated_duration for s in visual_plan)
             if total_estimated > 0:
-                scale = actual_duration / total_estimated
+                scale = target_video_duration / total_estimated
                 cumulative = 0.0
                 for seg in visual_plan:
                     seg.estimated_duration = seg.estimated_duration * scale
@@ -230,7 +285,9 @@ class Pipeline:
                     seg.estimated_end = cumulative + seg.estimated_duration
                     cumulative += seg.estimated_duration
                 self._logger.info(
-                    "Segment durations scaled by %.3f to match actual audio.", scale
+                    "Segment durations scaled by %.3f to match target video"
+                    " duration.",
+                    scale,
                 )
         else:
             self._logger.info(
