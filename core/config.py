@@ -39,6 +39,7 @@ class Config:
     deepgram_api_key: Optional[str]
     deepgram_voice_model: str
     tts_leading_silence: float
+    tts_trailing_silence: float
 
     # --- Image ---
     image_provider: str
@@ -77,6 +78,10 @@ class Config:
         # Seconds of silence to prepend before narration (0 = disabled).
         self.tts_leading_silence = float(
             os.getenv("TTS_LEADING_SILENCE_SECONDS", "0.0")
+        )
+        # Seconds of silence to append after narration (0 = disabled).
+        self.tts_trailing_silence = float(
+            os.getenv("TTS_TRAILING_SILENCE_SECONDS", "0.0")
         )
 
         # Image
