@@ -27,6 +27,7 @@ from core.models import ImageResult, RunMetadata, VisualSegment, TTSResult
 from core.utils import (
     append_silence,
     build_image_prompt,
+    build_negative_prompt,
     classify_scene_focus,
     create_visual_plan,
     ensure_dir,
@@ -239,6 +240,10 @@ class Pipeline:
                 scene_focus=seg.scene_focus,
                 shot_type=seg.shot_type,
             )
+            seg.negative_prompt = build_negative_prompt(
+                negative_text=negative_text,
+                scene_focus=seg.scene_focus,
+            )
             self._logger.info(
                 "[Prompt %02d] Internal anti-text rules applied",
                 seg.index + 1,
@@ -400,7 +405,10 @@ class Pipeline:
                 total_segs,
             )
             img_result = image_provider.generate(
-                seg.image_prompt, img_path, segment_index=seg.index
+                seg.image_prompt,
+                img_path,
+                segment_index=seg.index,
+                negative_prompt=seg.negative_prompt,
             )
             image_results.append(img_result)
             self._logger.info(

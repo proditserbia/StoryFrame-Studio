@@ -41,6 +41,7 @@ class ReplicateImageProvider(ImageProviderBase):
         prompt: str,
         output_path: Path,
         segment_index: int = 0,
+        negative_prompt: str = "",
     ) -> ImageResult:
         """Generate an image via Replicate and save it locally.
 
@@ -48,6 +49,11 @@ class ReplicateImageProvider(ImageProviderBase):
             prompt: Image generation prompt.
             output_path: Destination path for the PNG image.
             segment_index: Script segment index for logging.
+            negative_prompt: Optional negative prompt string.  Passed to the
+                model as a separate ``negative_prompt`` input field for models
+                that support it (e.g. SDXL, Stable Diffusion).  Automatically
+                skipped for FLUX models, which do not accept a
+                ``negative_prompt`` field and would return an API error.
 
         Returns:
             ImageResult with the saved image path.
@@ -79,17 +85,33 @@ class ReplicateImageProvider(ImageProviderBase):
             "height": 768,
         }
 
+        # FLUX models do not accept a ``negative_prompt`` input field and
+        # would return a 422 validation error if we pass one.  All other
+        # common Replicate models (SDXL, SD 1.x / 2.x, Kandinsky, etc.)
+        # process it as a separate conditioning channel and benefit greatly
+        # from having it populated.
+        _model_lower = model_ref.lower()
+        _supports_negative_prompt = (
+            negative_prompt
+            and "flux" not in _model_lower
+        )
+
+        # Build the shared model input dict once before choosing the endpoint.
+        _input: dict[str, Any] = {"prompt": prompt, **_image_hint}
+        if _supports_negative_prompt:
+            _input["negative_prompt"] = negative_prompt
+
         # Determine endpoint – models with versions use /predictions
         if ":" in model_ref:
             owner_model, version = model_ref.split(":", 1)
             payload: dict[str, Any] = {
                 "version": version,
-                "input": {"prompt": prompt, **_image_hint},
+                "input": _input,
             }
             url = f"{_API_BASE}/predictions"
         else:
             # Latest model version endpoint
-            payload = {"input": {"prompt": prompt, **_image_hint}}
+            payload = {"input": _input}
             url = f"{_API_BASE}/models/{model_ref}/predictions"
 
         self._logger.info(

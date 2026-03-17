@@ -385,6 +385,95 @@ def estimate_duration(text: str, words_per_minute: int = 130) -> float:
     return max(1.0, (word_count / words_per_minute) * 60.0)
 
 
+def build_negative_prompt(
+    negative_text: str = "",
+    scene_focus: str = "environment",
+) -> str:
+    """Build a compact negative prompt string for image generation APIs.
+
+    Combines the internal anti-text and anti-portrait safety rules with any
+    external ``negative.txt`` content into a concise comma-separated list
+    suitable for the ``negative_prompt`` parameter of image generation models
+    (e.g. SDXL, Stable Diffusion).  The negative prompt is processed by a
+    separate conditioning channel in these models, making it far more
+    effective than embedding prohibitions inside the positive prompt.
+
+    Args:
+        negative_text: Content of ``negative.txt`` (optional).  Comment
+            lines starting with ``#`` and blank lines are ignored.
+        scene_focus: Scene focus value for focus-specific portrait
+            exclusions.
+
+    Returns:
+        A comma-separated negative prompt string.
+    """
+    # Core always-enforced exclusions — text and portrait artefacts.
+    items: list[str] = [
+        "text",
+        "readable text",
+        "letters",
+        "words",
+        "subtitles",
+        "captions",
+        "watermarks",
+        "logos",
+        "labels",
+        "signs with text",
+        "graffiti",
+        "UI overlay",
+        "menu",
+        "HUD",
+        "headshot",
+        "portrait",
+        "face close-up",
+        "tight face crop",
+        "close-up portrait",
+        "anime",
+        "cartoon",
+        "illustration",
+    ]
+
+    # Focus-specific portrait / framing negatives.
+    _focus_negatives: dict[str, list[str]] = {
+        "environment": [
+            "person dominant in frame",
+            "single figure foreground",
+            "centred person",
+        ],
+        "object_detail": [
+            "person dominant in frame",
+        ],
+        "person_in_environment": [
+            "tight headshot",
+            "face filling frame",
+        ],
+        "reaction_shot": [
+            "full face filling frame",
+            "tight headshot",
+        ],
+    }
+    safe_focus = scene_focus if scene_focus in _VALID_SCENE_FOCUS else "environment"
+    items.extend(_focus_negatives.get(safe_focus, []))
+
+    # Incorporate external negative.txt — strip comment lines and blank lines.
+    if negative_text and negative_text.strip():
+        for line in negative_text.splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                items.append(line)
+
+    # Deduplicate while preserving insertion order.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in items:
+        normalised = item.lower()
+        if normalised not in seen:
+            seen.add(normalised)
+            unique.append(item)
+
+    return ", ".join(unique)
+
+
 def build_image_prompt(
     segment_text: str,
     image_instructions: str,
@@ -397,25 +486,29 @@ def build_image_prompt(
 ) -> str:
     """Combine segment text and optional style files into a structured image prompt.
 
-    Prompt sections are assembled in a deterministic order so that each block
-    receives appropriate weight from the image model:
+    Prompt sections are assembled in a deterministic order chosen to maximise
+    the weight given to the most critical constraints within the model's token
+    budget.  Image generation models have hard token limits (typically 77–512
+    tokens), so the most important rules are placed **first**:
 
-    1. **GLOBAL STYLE RULES** – mandatory visual/thematic directives from
-       ``images.txt``.  Placed first and flagged as strict rules.
-    2. **CONSISTENCY ANCHORS** – cross-scene continuity hints from
-       ``anchors.txt`` (optional).
-    3. **SHOT RULES** – camera composition guidance from ``shot_rules.txt``
-       (optional).
-    4. **NEGATIVE CONSTRAINTS** – hard exclusions from ``negative.txt``
-       (optional).
-    5. **SCENE FOCUS / SHOT TYPE** – classified visual focus and shot type
+    1. **TEXT SAFETY RULES** – always-enforced anti-text block placed first so
+       it is always within the model's token processing window.
+    2. **ANTI-PORTRAIT RULES** – always-on framing constraint placed second for
+       the same reason.
+    3. **COMPOSITION DIRECTIVE** – focus-specific framing instruction.
+    4. **SCENE FOCUS / SHOT TYPE** – classified visual focus and shot type
        derived from the narration content.
-    6. **COMPOSITION DIRECTIVE** – focus-specific framing instruction.
-    7. **ANTI-PORTRAIT RULES** – always-on constraint that prevents the model
-       from defaulting to portrait-style images, adapted per focus type.
-    8. **CURRENT NARRATION SEGMENT** – the narration text that grounds the
+    5. **GLOBAL STYLE RULES** – mandatory visual/thematic directives from
+       ``images.txt``.
+    6. **CONSISTENCY ANCHORS** – cross-scene continuity hints from
+       ``anchors.txt`` (optional).
+    7. **SHOT RULES** – camera composition guidance from ``shot_rules.txt``
+       (optional).
+    8. **NEGATIVE CONSTRAINTS** – hard exclusions from ``negative.txt``
+       (optional).
+    9. **CURRENT NARRATION SEGMENT** – the narration text that grounds the
        prompt in the actual story moment.
-    9. **TASK** – an explicit output instruction that summarises the rules.
+    10. **TASK** – an explicit output instruction that summarises the rules.
 
     Any optional block whose text is empty or whitespace-only is silently
     omitted so that missing files do not leave empty sections in the prompt.
@@ -447,8 +540,13 @@ def build_image_prompt(
     # that a stale or unknown scene_focus safely falls back to 'environment'.
     safe_focus = scene_focus if scene_focus in _VALID_SCENE_FOCUS else "environment"
 
+    # Critical rules are placed FIRST so they land within the model's token
+    # budget even when the full prompt exceeds the model's token limit.
     parts: list[str] = [
-        "Follow these visual rules strictly.",
+        _TEXT_SAFETY_BLOCK,
+        f"ANTI-PORTRAIT RULES (ALWAYS ENFORCED):\n{_ANTI_PORTRAIT_RULES[safe_focus]}",
+        f"COMPOSITION DIRECTIVE:\n{_COMPOSITION_DIRECTIVES[safe_focus]}",
+        f"SCENE FOCUS: {safe_focus}\nSHOT TYPE: {shot_type}",
         f"GLOBAL STYLE RULES:\n{instructions}",
     ]
 
@@ -460,24 +558,6 @@ def build_image_prompt(
 
     if negative_text and negative_text.strip():
         parts.append(f"NEGATIVE CONSTRAINTS:\n{negative_text.strip()}")
-
-    # Internal anti-text safety block — always injected regardless of preset files
-    parts.append(_TEXT_SAFETY_BLOCK)
-
-    # Scene intelligence — always injected, independent of external files
-    parts.append(
-        f"SCENE FOCUS: {safe_focus}\n"
-        f"SHOT TYPE: {shot_type}"
-    )
-
-    parts.append(
-        f"COMPOSITION DIRECTIVE:\n{_COMPOSITION_DIRECTIVES[safe_focus]}"
-    )
-
-    parts.append(
-        f"ANTI-PORTRAIT RULES (ALWAYS ENFORCED):\n"
-        f"{_ANTI_PORTRAIT_RULES[safe_focus]}"
-    )
 
     parts.append(f"CURRENT NARRATION SEGMENT:\nScene {index + 1}: {scene}")
 

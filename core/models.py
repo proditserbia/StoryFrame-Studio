@@ -51,6 +51,7 @@ class VisualSegment:
     estimated_end: float
     estimated_duration: float
     image_prompt: str = ""
+    negative_prompt: str = ""
     transition_hint: str = ""
     emphasis_keyword: str = ""
     scene_focus: str = "environment"
@@ -65,6 +66,7 @@ class VisualSegment:
             "estimated_end": round(self.estimated_end, 2),
             "estimated_duration": round(self.estimated_duration, 2),
             "image_prompt": self.image_prompt,
+            "negative_prompt": self.negative_prompt,
             "transition_hint": self.transition_hint,
             "emphasis_keyword": self.emphasis_keyword,
             "scene_focus": self.scene_focus,
