@@ -85,10 +85,17 @@ zoom and pan motion without upscaling artefacts)
 
 NEGATIVE CONSTRAINTS
 
-no text
+no readable text anywhere in the image
 no subtitles
+no captions
 no logos
 no watermarks
+no signs with legible letters
+no labels or packaging text
+no poster text
+no writing on walls
+no graffiti text
+no UI text, menus, or HUD overlays
 no cartoon style
 no illustration style
 no anime style
@@ -96,6 +103,8 @@ no extra people not mentioned in narration
 no close-up portraits
 no headshots
 no tight face crops
+if text-bearing objects appear (books, signs, screens, packaging),
+keep any text blurred, turned away, obscured, or completely unreadable
 
 OUTPUT FORMAT
 

@@ -105,6 +105,23 @@ _COMPOSITION_DIRECTIVES: dict[str, str] = {
     ),
 }
 
+#: Internal anti-text safety block — always injected into every image prompt
+#: regardless of what preset files contain.  This is a last-resort guarantee
+#: that text-bearing artefacts (subtitles, signage, watermarks, labels, etc.)
+#: are excluded from generated images.
+_TEXT_SAFETY_BLOCK: str = (
+    "TEXT SAFETY RULES (ALWAYS ENFORCED — NON-NEGOTIABLE):\n"
+    "- no readable text anywhere in the image\n"
+    "- no subtitles, captions, or on-screen titles\n"
+    "- no logos or watermarks\n"
+    "- no signs with legible letters\n"
+    "- no labels or packaging text\n"
+    "- no poster text, wall writing, or graffiti text\n"
+    "- no UI text, menus, buttons, or HUD overlays\n"
+    "- if text-bearing objects appear (books, signs, screens, packaging),\n"
+    "  keep any text blurred, turned away, obscured, or completely unreadable"
+)
+
 #: Anti-portrait rules per scene_focus.  These are always injected to prevent
 #: the image model from defaulting to portrait compositions.
 _ANTI_PORTRAIT_RULES: dict[str, str] = {
@@ -443,6 +460,9 @@ def build_image_prompt(
 
     if negative_text and negative_text.strip():
         parts.append(f"NEGATIVE CONSTRAINTS:\n{negative_text.strip()}")
+
+    # Internal anti-text safety block — always injected regardless of preset files
+    parts.append(_TEXT_SAFETY_BLOCK)
 
     # Scene intelligence — always injected, independent of external files
     parts.append(
