@@ -1,104 +1,87 @@
 # Image Generation Style Instructions
 # ─────────────────────────────────────────────────────────────────────────────
-# Optimized for a Horror YouTube channel.
-# Designed to produce cinematic horror visuals for ANY horror story —
-# whether supernatural, psychological, cosmic, folk, urban, or gothic.
-# Images must strictly follow the narration while maintaining a consistent
-# horror atmosphere throughout.
+# Generic niche-neutral defaults for StoryFrame Studio.
+# These rules apply to any narrated YouTube-style video.
+#
+# To adapt the app to a specific niche (horror, mystery, documentary, etc.),
+# replace or supplement these defaults by pointing the UI at a preset folder:
+#   prompts/presets/<your-niche>/images.txt
+#
+# See prompts/presets/horror/ for a complete horror-channel example.
 # ─────────────────────────────────────────────────────────────────────────────
 
-You are generating cinematic image prompts for a narrated horror YouTube video.
+You are generating image prompts for a narrated YouTube video.
 
-Your task is to convert a narration segment into ONE photorealistic cinematic scene that visually represents the moment being described.
-
-The image must feel like a frame from a horror film — unsettling, atmospheric, and drenched in dread. The visual style should adapt to match the specific type of horror in the narration (psychological, supernatural, body horror, folk horror, cosmic horror, etc.) while always maintaining a dark, foreboding tone.
+Your task is to convert a narration segment into ONE cinematic scene that
+faithfully represents the moment being described.
 
 FRAMING — CRITICAL RULE
 
 ALWAYS default to ENVIRONMENT-FIRST framing.
 
-Prioritize the setting described in the narration: forests, abandoned buildings, dark corridors, fog-covered roads, decayed rooms, underground spaces, graveyards, remote cabins, basements, attics, hospitals, suburban homes, city streets at night, or any location the story takes place in.
+Prioritize the setting described in the narration: rooms, streets, landscapes,
+buildings, natural environments, vehicles, or any location the story takes
+place in.
 
-When the narration focuses on a specific object or detail — a door creaking open, a shadow on the wall, a figure in the distance, a bloodstain on the floor, an old photograph, a flickering light — frame the shot so that element is the clear focal point within the larger environment.
+When the narration focuses on a specific object or detail, frame the shot so
+that element is the clear focal point within the larger environment.
 
-DO NOT generate close-up human portraits, face close-ups, or tight headshots unless the narration is specifically about a person's face, reaction, or expression.
+DO NOT generate close-up human portraits, face close-ups, or tight headshots
+unless the narration is specifically about a person's face or expression.
 
-When a person appears in the scene, place them as a small or mid-distance figure within the larger environment — never as the dominant subject filling the frame. Show them from behind, in silhouette, partially obscured, or at a distance. This preserves mystery and dread.
+When a person appears in the scene, place them as a small or mid-distance
+figure within the larger environment — never as the dominant subject filling
+the frame.
 
 SCENE MATCHING — STRICT RULE
 
-The image MUST directly and faithfully reflect what is described in the narration segment. Every image must be grounded in the story being told.
+The image MUST directly and faithfully reflect what is described in the
+narration segment.
 
-Focus on the key environment, object, creature, or event described in the text.
+Focus on the key environment, object, or event described in the text.
 
 DO NOT invent visual elements not present or implied in the narration.
-
-If the narration describes something unsettling — a strange noise, a figure watching from the dark, something moving where nothing should be — the image should capture the physical evidence or atmosphere of that moment rather than showing a generic horror scene.
 
 ENVIRONMENT CONSISTENCY
 
 Maintain consistent environments across scenes within the same story.
 
-If the story takes place in one location, keep the architecture, textures, lighting quality, and spatial layout visually consistent from scene to scene.
+If the story takes place in one location, keep the architecture, lighting
+quality, textures, and spatial layout visually consistent from scene to scene.
 
-Do not change the setting style or location unless the narration indicates a new environment.
-
-Recurring elements (a specific door, a window, a path, an object) should look recognizably identical whenever they reappear.
+Do not change the setting style or location unless the narration indicates a
+new environment.
 
 VISUAL STYLE
 
-photorealistic cinematic horror
-dark, atmospheric, foreboding
-tension and dread conveyed through environment, lighting, and composition
-settings that feel real and grounded — even when depicting the supernatural
-sharp detail on horror-relevant elements (shadows, silhouettes, textures, decay)
-no cartoonish or exaggerated horror — everything should feel plausible and visceral
-
-The horror comes from atmosphere, composition, and what lurks at the edge of visibility — unseen threats, oppressive darkness, spaces that feel wrong.
+photorealistic cinematic
+lighting and color palette adapted to the mood of the narration
+sharp detail on the key narrative elements
+no cartoonish or exaggerated imagery — everything should feel grounded and real
 
 CAMERA STYLE
 
 cinematic film still
 wide or medium shots — NEVER close-up portrait
-35mm film look with subtle grain
-shallow depth of field — sharp foreground subject, soft ominous background
-subject or key element slightly off-center for unease
-low angles to make environments feel towering and oppressive
-eye-level shots down corridors, paths, or tunnels to emphasize depth and darkness
+shallow depth of field — sharp foreground subject, soft background
+subject or key element slightly off-center for visual interest
+natural angles suited to the scene
 
 Scenes must work well for slow Ken Burns zoom and pan motion.
-
-LIGHTING
-
-low-key horror lighting
-dominant shadows with selective pools of dim light
-cold desaturated tones — pale blues, sickly greens, muted grays
-warm sources only when the story calls for them (firelight, candles, old lamps)
-strong contrast between light and darkness
-volumetric light through fog, dust, or haze when appropriate
-practical light sources that match the story setting
-darkness as a compositional element — large areas of deep black that suggest hidden threats
-
-COLOR PALETTE
-
-desaturated and cold by default
-deep blacks, dark blues, muted greens, ashen grays
-occasional warm accent from fire, old bulbs, or screens
-skin tones rendered pale and washed out
-no bright or saturated colors unless the narration specifically describes them
-night scenes should be near-monochromatic with subtle blue or green tint
 
 RESOLUTION AND COMPOSITION
 
 Landscape cinematic framing
 16:9 aspect ratio
 
-Images should be composed for a 1920x1080 video frame.
+Images should be composed for a 1920×1080 video frame.
 
-Generate images slightly larger than the final video resolution to allow Ken Burns zoom.
+Generate images slightly larger than the final video resolution to allow Ken
+Burns zoom.
 
-Preferred generation resolution:
-2304x1296
+Preferred generation resolution: 2304×1296
+(approximately 1.2× the 1920×1080 output; provides 20% overhead for Ken Burns
+zoom and pan motion without upscaling artefacts)
 
 NEGATIVE CONSTRAINTS
 
@@ -109,18 +92,14 @@ no watermarks
 no cartoon style
 no illustration style
 no anime style
-no distorted faces
 no extra people not mentioned in narration
 no close-up portraits
 no headshots
 no tight face crops
-no generic stock-photo horror (no random skulls, bleeding walls, or cliché jump-scare imagery unless grounded in the narration)
-no bright, cheerful, or well-lit scenes unless the narration explicitly describes such a setting
-no over-the-top gore unless the narration explicitly describes it
-no supernatural visual effects (glowing eyes, ghostly auras) unless the narration explicitly describes them
 
 OUTPUT FORMAT
 
-Return ONE detailed image prompt describing a cinematic horror scene that faithfully represents the narration segment.
+Return ONE detailed image prompt describing a cinematic scene that faithfully
+represents the narration segment.
 Do not explain anything.
 Do not include extra commentary.

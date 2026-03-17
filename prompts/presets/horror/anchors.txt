@@ -1,0 +1,56 @@
+# Consistency Anchors — Horror Preset
+# ─────────────────────────────────────────────────────────────────────────────
+# Horror-specific visual anchors for StoryFrame Studio.
+# Injected into every image prompt to maintain a consistent horror atmosphere
+# and visual language across all generated scenes, regardless of the specific
+# story being told.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Atmosphere ---
+Every scene must convey a pervasive sense of unease and dread. Even calm or
+quiet moments should feel like something is about to go wrong. The environment
+itself should feel hostile, watchful, or suffocating — as if the space does
+not want the characters there.
+
+# --- Lighting consistency ---
+Maintain a consistent low-key lighting approach throughout the story. Dominant
+shadows, limited light sources, and large areas of near-black. Light should
+feel fragile and insufficient — small pools surrounded by overwhelming
+darkness. When transitioning between scenes, lighting mood should remain
+cohesive unless the narration explicitly shifts setting or time of day.
+
+# --- Color grading ---
+Apply a consistent cold, desaturated color grade across all scenes. Deep
+blacks, steely blues, muted greens, and ashen grays form the base palette.
+Warm tones appear only from diegetic sources (fire, old bulbs, candles) and
+should feel isolated against the cold surroundings. This color language must
+remain uniform across the entire story.
+
+# --- Environmental texture ---
+Surfaces and environments should show texture and imperfection: grain in wood,
+cracks in walls, moisture on stone, dust in the air, rust on metal. These
+details ground the horror in physical reality and make spaces feel lived-in,
+aged, or decaying. Maintain the same level of textural detail and wear across
+all scenes set in the same location.
+
+# --- Character depiction ---
+When characters appear, show them as mid-distance or partial figures — seen
+from behind, standing in doorways, as silhouettes against dim light, or
+partially obscured by environment. Never show a clear, well-lit face. Convey
+emotion through body language, posture, and their small scale within the
+larger, threatening environment. Maintain consistent depiction of recurring
+characters (clothing, build, silhouette shape) across scenes.
+
+# --- Compositional tension ---
+Use off-centre framing, negative space, and depth to create visual tension.
+Leave dark, empty areas in the frame that suggest unseen presences. Doorways,
+corridors, and openings should recede into blackness. The viewer's eye should
+be drawn to a focal point while remaining aware of the threatening void around
+it. This compositional approach must be consistent across all scenes.
+
+# --- Scale and isolation ---
+Characters should appear small relative to their environment whenever possible.
+Large empty rooms, vast dark landscapes, towering structures, and long
+corridors all serve to emphasize human vulnerability. Even in confined spaces,
+use angles that make the walls feel like they are closing in. The sense of
+isolation or entrapment should persist across scenes.

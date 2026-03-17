@@ -132,6 +132,7 @@ class RunMetadata:
     image_provider: str
     video_provider: str
     segmentation_density: str = "balanced"
+    prompt_sources: List[str] = field(default_factory=list)
     tts_result: Optional[dict] = None
     image_results: List[dict] = field(default_factory=list)
     visual_plan: List[dict] = field(default_factory=list)
@@ -150,6 +151,7 @@ class RunMetadata:
             "image_provider": self.image_provider,
             "video_provider": self.video_provider,
             "segmentation_density": self.segmentation_density,
+            "prompt_sources": self.prompt_sources,
             "tts_result": self.tts_result,
             "image_results": self.image_results,
             "visual_plan": self.visual_plan,
