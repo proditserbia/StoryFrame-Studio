@@ -45,6 +45,7 @@ class Config:
     image_provider: str
     replicate_api_token: Optional[str]
     replicate_model: Optional[str]
+    image_validation_retries: int
 
     # --- Video ---
     video_provider: str
@@ -88,6 +89,11 @@ class Config:
         self.image_provider = os.getenv("IMAGE_PROVIDER", "replicate").lower().strip()
         self.replicate_api_token = os.getenv("REPLICATE_API_TOKEN") or None
         self.replicate_model = os.getenv("REPLICATE_MODEL") or None
+        # Number of additional generation attempts when post-generation
+        # validation fails (0 = no retries; placeholder for future QA).
+        self.image_validation_retries = int(
+            os.getenv("IMAGE_VALIDATION_RETRIES", "0")
+        )
 
         # Video
         self.video_provider = os.getenv("VIDEO_PROVIDER", "none").lower().strip()

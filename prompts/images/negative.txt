@@ -1,11 +1,10 @@
-# Negative Constraints — Horror Preset
+# Negative Constraints — Generic Default
 # ─────────────────────────────────────────────────────────────────────────────
-# Horror-specific hard exclusions for StoryFrame Studio image generation.
+# Niche-neutral hard exclusions for StoryFrame Studio image generation.
 # Loaded automatically when this file is present alongside images.txt in the
 # same preset folder.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# TEXT AVOIDANCE — STRICT
 no readable text anywhere in the image
 no subtitles
 no captions
@@ -17,24 +16,13 @@ no poster text
 no writing on walls or surfaces
 no graffiti text
 no UI text, menus, buttons, or HUD overlays
-if text-bearing objects appear (books, signs, notices, labels, product
-packaging, posters), keep any text blurred, turned away, obscured by shadow,
-cropped out, or otherwise completely unreadable
-
-# STYLE EXCLUSIONS
 no cartoon style
 no illustration style
 no anime style
-no distorted faces
 no extra people not mentioned in narration
 no close-up portraits
 no headshots
 no tight face crops
-no generic stock-photo horror (no random skulls, bleeding walls, or cliché
-jump-scare imagery unless grounded in the narration)
-no bright, cheerful, or well-lit scenes unless the narration explicitly
-describes such a setting
-no over-the-top gore unless the narration explicitly describes it
-no supernatural visual effects (glowing eyes, ghostly auras) unless the
-narration explicitly describes them
-no modern digital UI elements, screens showing menus, or HUD overlays
+no modern digital UI elements or screens showing menus
+if text-bearing objects appear (books, signs, screens, product packaging),
+keep any text blurred, turned away, obscured, or completely unreadable

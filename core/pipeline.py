@@ -240,6 +240,15 @@ class Pipeline:
                 shot_type=seg.shot_type,
             )
             self._logger.info(
+                "[Prompt %02d] Internal anti-text rules applied",
+                seg.index + 1,
+            )
+            if negative_text:
+                self._logger.info(
+                    "[Prompt %02d] negative.txt loaded",
+                    seg.index + 1,
+                )
+            self._logger.info(
                 "[Prompt %02d] Built image prompt (focus=%s, shot=%s, %d chars, sources: %d file(s))",
                 seg.index + 1,
                 seg.scene_focus,
@@ -394,6 +403,11 @@ class Pipeline:
                 seg.image_prompt, img_path, segment_index=seg.index
             )
             image_results.append(img_result)
+            self._logger.info(
+                "[Image %02d] Generated image saved",
+                seg.index + 1,
+            )
+            self._validate_generated_image(seg.index, img_result)
             metadata.image_results.append(
                 {
                     "segment_index": seg.index,
@@ -439,6 +453,35 @@ class Pipeline:
         metadata.success = True
         self._report("Done", 100)
         self._logger.info("Pipeline complete. Output: %s", output_video)
+
+    def _validate_generated_image(
+        self, segment_index: int, img_result: "ImageResult"
+    ) -> None:
+        """Placeholder post-generation image validation hook.
+
+        This hook is called after every image is saved.  It is intended as an
+        integration point for future automated QA checks (e.g. OCR-based text
+        detection, aspect-ratio verification, or content moderation).
+
+        The configurable ``image_validation_retries`` value in :class:`Config`
+        controls how many times the pipeline could re-generate an image when a
+        future validator signals a failure.  Currently no real validation is
+        performed; the hook simply logs that validation could occur here.
+
+        Args:
+            segment_index: Zero-based segment index (for log labels).
+            img_result: The :class:`ImageResult` produced for this segment.
+        """
+        label = segment_index + 1
+        retries = self._config.image_validation_retries
+        self._logger.info(
+            "[Image %02d] Validation hook ready (retries configured: %d)",
+            label,
+            retries,
+        )
+        # Future: run OCR or other checks on img_result.image_path here.
+        # If validation fails and retries > 0, re-generate up to that many
+        # additional times before accepting the result.
 
     def _check_cancel(self) -> None:
         """Raise PipelineError if cancellation was requested."""

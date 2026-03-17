@@ -129,3 +129,20 @@ Return ONE detailed image prompt describing a cinematic horror scene that
 faithfully represents the narration segment.
 Do not explain anything.
 Do not include extra commentary.
+
+TEXT AVOIDANCE — MANDATORY
+
+The generated image must contain NO readable text of any kind.
+
+no readable text anywhere in the image
+no subtitles, captions, or on-screen titles
+no logos or watermarks
+no signs with legible letters
+no labels or packaging text
+no poster text or wall writing
+no UI text, menus, or HUD overlays
+
+If text-bearing objects appear (books, signs, notices, labels, product
+packaging, posters, graffiti), the text MUST be blurred, turned away,
+obscured by shadow, cropped out, or otherwise rendered completely unreadable.
+The horror atmosphere must never be broken by legible typography.
