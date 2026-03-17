@@ -27,10 +27,12 @@ from core.models import ImageResult, RunMetadata, VisualSegment, TTSResult
 from core.utils import (
     append_silence,
     build_image_prompt,
+    classify_scene_focus,
     create_visual_plan,
     ensure_dir,
     format_time,
     get_audio_duration,
+    get_shot_type,
     prepend_silence,
     split_script_into_segments,
 )
@@ -202,6 +204,11 @@ class Pipeline:
         visual_plan: List[VisualSegment] = create_visual_plan(raw_segments)
         metadata.segments = len(visual_plan)
 
+        # Classify scene focus and assign shot type for each segment
+        for seg in visual_plan:
+            seg.scene_focus = classify_scene_focus(seg.text)
+            seg.shot_type = get_shot_type(seg.scene_focus)
+
         self._logger.info(
             "Visual plan: %d segments, total estimated %.1fs",
             len(visual_plan),
@@ -210,10 +217,12 @@ class Pipeline:
         for seg in visual_plan:
             preview = seg.text[:60].replace("\n", " ")
             self._logger.info(
-                '[Segment %02d] %s - %s | "%s..."',
+                '[Segment %02d] %s - %s | focus=%s shot=%s | "%s..."',
                 seg.index + 1,
                 format_time(seg.estimated_start),
                 format_time(seg.estimated_end),
+                seg.scene_focus,
+                seg.shot_type,
                 preview,
             )
         self._check_cancel()
@@ -227,10 +236,14 @@ class Pipeline:
                 anchor_text=anchor_text,
                 shot_rules_text=shot_rules_text,
                 negative_text=negative_text,
+                scene_focus=seg.scene_focus,
+                shot_type=seg.shot_type,
             )
             self._logger.info(
-                "[Prompt %02d] Built image prompt (%d chars, sources: %d file(s))",
+                "[Prompt %02d] Built image prompt (focus=%s, shot=%s, %d chars, sources: %d file(s))",
                 seg.index + 1,
+                seg.scene_focus,
+                seg.shot_type,
                 len(seg.image_prompt),
                 len(prompt_sources),
             )

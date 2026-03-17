@@ -11,6 +11,216 @@ from typing import List, Optional
 from core.models import VisualSegment
 
 # ---------------------------------------------------------------------------
+# Scene focus classification — visual intelligence layer
+# ---------------------------------------------------------------------------
+
+#: Words that indicate the scene is primarily about a physical location or
+#: architectural space.  Matched as whole tokens (case-insensitive).
+_ENVIRONMENT_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "house", "room", "hallway", "hall", "attic", "basement", "kitchen",
+        "stairs", "staircase", "ceiling", "wall", "floor", "corridor",
+        "street", "road", "path", "alley", "bridge", "tunnel", "cave",
+        "forest", "woods", "field", "yard", "garden", "garage", "porch",
+        "lobby", "entrance", "exit", "office", "bathroom", "bedroom",
+        "warehouse", "cabin", "rooftop", "parking", "church", "hospital",
+        "school", "apartment", "building", "structure", "landscape",
+        "exterior", "interior", "outside", "inside", "upstairs", "downstairs",
+    }
+)
+
+#: Words that indicate a specific object or detail is the primary visual
+#: subject.  Objects are smaller focal elements within the environment.
+#: Note: architectural elements such as door, window, stairs are intentionally
+#: absent here — they belong to the environment category.
+_OBJECT_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "mug", "cup", "glass", "bottle", "jar", "lamp", "bulb", "light",
+        "floorboard", "board", "nail", "hook", "string", "rope", "wire",
+        "cable", "clip", "counter", "shelf", "drawer", "handle",
+        "knob", "switch", "lock", "key", "box", "bag", "case", "frame",
+        "mirror", "photo", "photograph", "note", "letter", "sign", "book",
+        "phone", "screen", "pipe", "hatch", "chair",
+        "table", "bed", "blanket", "curtain", "rug", "stain", "mark",
+        "scratch", "crack", "splinter", "shadow", "reflection", "smear",
+    }
+)
+
+#: Words that indicate the narrator or a character is experiencing an
+#: emotional or physical reaction.  These are *strong* reaction signals
+#: (physical or emotional state) that should shift focus toward the person.
+_REACTION_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "fear", "terror", "afraid", "scared", "panic", "dread", "horror",
+        "disturbed", "shocked", "trembling", "shaking", "frozen", "paralyzed",
+        "paralysed", "breath", "breathing", "breathe", "heartbeat", "heart",
+        "pulse", "nausea", "sick", "sweat", "pale", "shiver",
+        "whispered", "screamed", "yelled", "cried", "sobbed", "gasped",
+        "choked", "froze", "hesitated", "flinched", "startled", "recoiled",
+        "trembled", "pounding", "racing", "listening", "waking",
+        "woke", "awake", "awoken",
+    }
+)
+
+#: Set of all valid scene_focus values.  All three scene-intelligence
+#: dictionaries below are keyed by exactly these values; keeping a single
+#: source of truth prevents silent key mismatches.
+_VALID_SCENE_FOCUS: frozenset[str] = frozenset(
+    {"environment", "object_detail", "person_in_environment", "reaction_shot"}
+)
+
+#: Mapping from scene_focus value to shot_type.
+_SHOT_TYPE_MAP: dict[str, str] = {
+    "environment": "wide",
+    "object_detail": "detail",
+    "person_in_environment": "medium",
+    "reaction_shot": "medium",
+}
+
+#: Composition directives indexed by scene_focus.
+_COMPOSITION_DIRECTIVES: dict[str, str] = {
+    "environment": (
+        "Show the full environment as the primary subject. "
+        "Wide shot establishing the location — architecture, space, and "
+        "atmosphere fill the frame. Any person present must be a small "
+        "figure at mid-distance or further within that environment."
+    ),
+    "object_detail": (
+        "Frame the specific object as the clear focal point while keeping it "
+        "anchored within its surrounding environment. "
+        "The environment remains visible in the background. "
+        "No human figure should dominate the frame."
+    ),
+    "person_in_environment": (
+        "Show the person as a mid-distance figure within their surroundings. "
+        "The environment occupies the majority of the frame. "
+        "Convey emotion through body language and posture, not facial close-up."
+    ),
+    "reaction_shot": (
+        "Medium shot capturing a character's reaction through body language "
+        "and partial framing. Keep the face partially visible at most — "
+        "do not fill the frame with the face. "
+        "The surrounding environment should still be partially visible to "
+        "preserve spatial context."
+    ),
+}
+
+#: Anti-portrait rules per scene_focus.  These are always injected to prevent
+#: the image model from defaulting to portrait compositions.
+_ANTI_PORTRAIT_RULES: dict[str, str] = {
+    "environment": (
+        "DO NOT generate a close-up portrait or headshot. "
+        "DO NOT place a single person as the dominant centred subject. "
+        "DO NOT fill the frame with a human face. "
+        "The image MUST show the environment or location as the primary subject. "
+        "Environment-first composition is mandatory."
+    ),
+    "object_detail": (
+        "DO NOT generate a close-up portrait or headshot. "
+        "DO NOT fill the frame with a human face. "
+        "The image MUST be centred on the described object within its environment. "
+        "No person should be the primary subject."
+    ),
+    "person_in_environment": (
+        "DO NOT generate a tight headshot or face close-up. "
+        "The person must remain a mid-distance or smaller figure. "
+        "The environment must occupy the majority of the frame. "
+        "Show the person from behind, in silhouette, or partially obscured if possible."
+    ),
+    "reaction_shot": (
+        "DO NOT fill the entire frame with a face. "
+        "The face or upper body may be partially visible but must not become "
+        "a standard portrait-style headshot. "
+        "Partial framing, shadow, or environmental context must be present."
+    ),
+}
+
+
+def classify_scene_focus(text: str) -> str:
+    """Classify the visual focus of a narration segment using keyword heuristics.
+
+    Returns one of four focus values that describe what the generated image
+    should primarily depict:
+
+    - ``'environment'`` – the location or space is the primary subject.
+    - ``'object_detail'`` – a specific object within the environment is the
+      focal point.
+    - ``'person_in_environment'`` – a person is present but subordinate to
+      their environment.
+    - ``'reaction_shot'`` – a character's emotional or physical reaction is
+      the main subject.
+
+    The classifier is heuristic-based (keyword counting) and deliberately
+    generic — it is not hardcoded to any specific content niche.
+
+    **Tokenization note**: the text is lowercased and split into runs of
+    ASCII letters only (``[a-z]+``).  This means contractions and
+    hyphenated words are split at the punctuation boundary (e.g.
+    ``"don't"`` → ``{"don", "t"}``).  For keyword-counting purposes this
+    is sufficient and avoids over-matching composite terms.
+
+    **Tie-breaking**: when object and environment hit counts are equal and
+    both exceed reaction hits, ``'object_detail'`` wins because the
+    condition uses ``>=`` for the environment comparison, biasing toward the
+    more specific focus type.  When all three counts are equal and non-zero,
+    the reaction-with-environment branch wins (``'person_in_environment'``).
+
+    Default fallback when no keywords match: ``'environment'``.
+
+    Args:
+        text: The narration segment text to classify.
+
+    Returns:
+        One of ``'environment'``, ``'object_detail'``,
+        ``'person_in_environment'``, or ``'reaction_shot'``.
+    """
+    tokens = set(re.findall(r"[a-z]+", text.lower()))
+
+    env_hits = len(tokens & _ENVIRONMENT_KEYWORDS)
+    obj_hits = len(tokens & _OBJECT_KEYWORDS)
+    reaction_hits = len(tokens & _REACTION_KEYWORDS)
+
+    # Object-dominant: specific object is the focal element.
+    # Uses >= for environment comparison so ties favour the more specific focus.
+    if obj_hits > 0 and obj_hits >= env_hits and obj_hits > reaction_hits:
+        return "object_detail"
+
+    # Reaction with environmental context → person within environment
+    if reaction_hits > 0 and env_hits > 0:
+        return "person_in_environment"
+
+    # Pure reaction / emotion with no significant environment cues
+    if reaction_hits > 0 and env_hits == 0:
+        return "reaction_shot"
+
+    # Environment cues present (including the default fallback)
+    return "environment"
+
+
+def get_shot_type(scene_focus: str) -> str:
+    """Return the shot type that corresponds to a given scene_focus value.
+
+    Mapping:
+
+    - ``'environment'`` → ``'wide'``
+    - ``'object_detail'`` → ``'detail'``
+    - ``'person_in_environment'`` → ``'medium'``
+    - ``'reaction_shot'`` → ``'medium'``
+
+    Close shots are intentionally excluded from the automatic mapping.
+    They are controlled, rare, and should only appear when explicitly
+    warranted by the narration — never as the default.
+
+    Args:
+        scene_focus: One of the four scene focus values.
+
+    Returns:
+        A shot type string: ``'wide'``, ``'detail'``, ``'medium'``, or
+        ``'close'``.
+    """
+    return _SHOT_TYPE_MAP.get(scene_focus, "wide")
+
+# ---------------------------------------------------------------------------
 # Segmentation density presets
 # ---------------------------------------------------------------------------
 
@@ -165,6 +375,8 @@ def build_image_prompt(
     anchor_text: str = "",
     shot_rules_text: str = "",
     negative_text: str = "",
+    scene_focus: str = "environment",
+    shot_type: str = "wide",
 ) -> str:
     """Combine segment text and optional style files into a structured image prompt.
 
@@ -179,12 +391,21 @@ def build_image_prompt(
        (optional).
     4. **NEGATIVE CONSTRAINTS** – hard exclusions from ``negative.txt``
        (optional).
-    5. **CURRENT NARRATION SEGMENT** – the narration text that grounds the
+    5. **SCENE FOCUS / SHOT TYPE** – classified visual focus and shot type
+       derived from the narration content.
+    6. **COMPOSITION DIRECTIVE** – focus-specific framing instruction.
+    7. **ANTI-PORTRAIT RULES** – always-on constraint that prevents the model
+       from defaulting to portrait-style images, adapted per focus type.
+    8. **CURRENT NARRATION SEGMENT** – the narration text that grounds the
        prompt in the actual story moment.
-    6. **TASK** – an explicit output instruction that summarises the rules.
+    9. **TASK** – an explicit output instruction that summarises the rules.
 
     Any optional block whose text is empty or whitespace-only is silently
     omitted so that missing files do not leave empty sections in the prompt.
+
+    The ``scene_focus`` and ``shot_type`` values are injected regardless of
+    what the external text files contain, ensuring stable anti-portrait
+    behaviour even when prompt files are absent or minimal.
 
     Args:
         segment_text: Text of the narration segment for this scene.
@@ -193,12 +414,21 @@ def build_image_prompt(
         anchor_text: Optional content of ``anchors.txt``.
         shot_rules_text: Optional content of ``shot_rules.txt``.
         negative_text: Optional content of ``negative.txt``.
+        scene_focus: Classified visual focus for this segment
+            (``'environment'``, ``'object_detail'``,
+            ``'person_in_environment'``, or ``'reaction_shot'``).
+        shot_type: Derived shot type (``'wide'``, ``'detail'``,
+            ``'medium'``, or ``'close'``).
 
     Returns:
         A formatted image generation prompt string.
     """
+    # Normalise inputs
     instructions = image_instructions.strip()
     scene = segment_text.strip().replace("\n", " ")
+    # Use _VALID_SCENE_FOCUS as the single source of truth for valid values so
+    # that a stale or unknown scene_focus safely falls back to 'environment'.
+    safe_focus = scene_focus if scene_focus in _VALID_SCENE_FOCUS else "environment"
 
     parts: list[str] = [
         "Follow these visual rules strictly.",
@@ -213,6 +443,21 @@ def build_image_prompt(
 
     if negative_text and negative_text.strip():
         parts.append(f"NEGATIVE CONSTRAINTS:\n{negative_text.strip()}")
+
+    # Scene intelligence — always injected, independent of external files
+    parts.append(
+        f"SCENE FOCUS: {safe_focus}\n"
+        f"SHOT TYPE: {shot_type}"
+    )
+
+    parts.append(
+        f"COMPOSITION DIRECTIVE:\n{_COMPOSITION_DIRECTIVES[safe_focus]}"
+    )
+
+    parts.append(
+        f"ANTI-PORTRAIT RULES (ALWAYS ENFORCED):\n"
+        f"{_ANTI_PORTRAIT_RULES[safe_focus]}"
+    )
 
     parts.append(f"CURRENT NARRATION SEGMENT:\nScene {index + 1}: {scene}")
 
