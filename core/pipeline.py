@@ -162,26 +162,33 @@ class Pipeline:
         image_instructions = self._load_text(
             image_instructions_path, "image instructions"
         )
+        self._logger.info("[Prompt] Loaded %s", image_instructions_path.name)
 
-        # Load optional anchors.txt from the same directory as images.txt
-        anchor_text = ""
-        anchors_path = image_instructions_path.parent / "anchors.txt"
-        if anchors_path.exists():
-            self._logger.info(
-                "[Anchors] Found anchors.txt at %s — loading consistency anchors.",
-                anchors_path,
-            )
-            try:
-                anchor_text = anchors_path.read_text(encoding="utf-8")
-            except OSError as exc:
-                self._logger.warning(
-                    "[Anchors] Could not read anchors.txt: %s", exc
-                )
-        else:
-            self._logger.info(
-                "[Anchors] No anchors.txt found at %s — skipping consistency anchors.",
-                anchors_path,
-            )
+        # Discover optional prompt files co-located with the images.txt file.
+        # Any file that exists is loaded and its content passed to the prompt
+        # builder; missing files are skipped gracefully with a log message.
+        prompt_dir = image_instructions_path.parent
+        prompt_sources: list[str] = [str(image_instructions_path)]
+
+        anchor_text = self._load_optional_prompt_file(
+            prompt_dir / "anchors.txt", "anchors.txt"
+        )
+        if anchor_text:
+            prompt_sources.append(str(prompt_dir / "anchors.txt"))
+
+        shot_rules_text = self._load_optional_prompt_file(
+            prompt_dir / "shot_rules.txt", "shot_rules.txt"
+        )
+        if shot_rules_text:
+            prompt_sources.append(str(prompt_dir / "shot_rules.txt"))
+
+        negative_text = self._load_optional_prompt_file(
+            prompt_dir / "negative.txt", "negative.txt"
+        )
+        if negative_text:
+            prompt_sources.append(str(prompt_dir / "negative.txt"))
+
+        metadata.prompt_sources = prompt_sources
         self._check_cancel()
 
         # 3 -- Segment script and create visual plan
@@ -214,11 +221,18 @@ class Pipeline:
         # 4 -- Build image prompts (segment-specific, based on narration text)
         for seg in visual_plan:
             seg.image_prompt = build_image_prompt(
-                seg.text, image_instructions, seg.index, anchor_text=anchor_text
+                seg.text,
+                image_instructions,
+                seg.index,
+                anchor_text=anchor_text,
+                shot_rules_text=shot_rules_text,
+                negative_text=negative_text,
             )
             self._logger.info(
-                "[Prompt %02d] Generated image prompt based on segment text",
+                "[Prompt %02d] Built image prompt (%d chars, sources: %d file(s))",
                 seg.index + 1,
+                len(seg.image_prompt),
+                len(prompt_sources),
             )
         self._check_cancel()
 
@@ -422,6 +436,32 @@ class Pipeline:
         """Forward progress update."""
         self._logger.info("[%d%%] %s", pct, label)
         self._progress(label, pct)
+
+    def _load_optional_prompt_file(self, path: Path, label: str) -> str:
+        """Load an optional prompt/style text file.
+
+        Logs whether the file was found and loaded, or skipped.
+
+        Args:
+            path: File path.
+            label: Short label used in log messages (e.g. ``'anchors.txt'``).
+
+        Returns:
+            File content as a string, or an empty string if the file does not
+            exist or cannot be read.
+        """
+        if not path.exists():
+            self._logger.info("[Prompt] %s not found, skipping.", label)
+            return ""
+        try:
+            content = path.read_text(encoding="utf-8")
+            self._logger.info("[Prompt] Loaded %s", label)
+            return content
+        except OSError as exc:
+            self._logger.warning(
+                "[Prompt] Could not read %s: %s", label, exc
+            )
+            return ""
 
     def _load_text(self, path: Path, label: str) -> str:
         """Load text file content.

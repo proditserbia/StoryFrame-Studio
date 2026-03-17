@@ -1,0 +1,32 @@
+# Shot Rules — Horror Preset
+# ─────────────────────────────────────────────────────────────────────────────
+# Horror-specific camera and shot composition rules for StoryFrame Studio.
+# Loaded automatically when this file is present alongside images.txt in the
+# same preset folder.
+# ─────────────────────────────────────────────────────────────────────────────
+
+CAMERA STYLE
+
+cinematic film still
+35mm film look with subtle grain
+wide or medium shots — DO NOT use close-up portrait
+shallow depth of field — sharp foreground subject, soft ominous background
+subject or key element slightly off-centre for unease
+low angles to make environments feel towering and oppressive
+eye-level shots down corridors, paths, or tunnels to emphasise depth and
+darkness
+
+Scenes must work well for slow Ken Burns zoom and pan motion.
+
+SHOT COMPOSITION PRIORITIES (in order)
+
+1. Establish the environment fully before introducing any character or object.
+2. When an object is the focus, show it within its surroundings — not isolated.
+3. When a character is present, frame them small within a large, threatening
+   space.
+4. Use depth: foreground element, mid-ground subject, ominous background.
+5. Leave significant empty or dark space in the frame — the unseen is more
+   frightening than the seen.
+6. Avoid symmetry; slightly unbalanced compositions create subliminal unease.
+7. Doorways, windows, and thresholds should frame darkness or uncertainty
+   beyond them.

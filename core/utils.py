@@ -163,22 +163,36 @@ def build_image_prompt(
     image_instructions: str,
     index: int,
     anchor_text: str = "",
+    shot_rules_text: str = "",
+    negative_text: str = "",
 ) -> str:
-    """Combine segment text, style instructions, and optional anchors into an image prompt.
+    """Combine segment text and optional style files into a structured image prompt.
 
-    The global style rules from ``prompts/images/images.txt`` are placed as a
-    strong directive block at the top of the prompt so that the image model
-    treats them as mandatory constraints rather than optional trailing context.
-    Optional consistency anchors from ``prompts/images/anchors.txt`` follow,
-    providing cross-scene visual continuity hints.  The scene description
-    grounds the prompt in the actual narration text.
+    Prompt sections are assembled in a deterministic order so that each block
+    receives appropriate weight from the image model:
+
+    1. **GLOBAL STYLE RULES** – mandatory visual/thematic directives from
+       ``images.txt``.  Placed first and flagged as strict rules.
+    2. **CONSISTENCY ANCHORS** – cross-scene continuity hints from
+       ``anchors.txt`` (optional).
+    3. **SHOT RULES** – camera composition guidance from ``shot_rules.txt``
+       (optional).
+    4. **NEGATIVE CONSTRAINTS** – hard exclusions from ``negative.txt``
+       (optional).
+    5. **CURRENT NARRATION SEGMENT** – the narration text that grounds the
+       prompt in the actual story moment.
+    6. **TASK** – an explicit output instruction that summarises the rules.
+
+    Any optional block whose text is empty or whitespace-only is silently
+    omitted so that missing files do not leave empty sections in the prompt.
 
     Args:
         segment_text: Text of the narration segment for this scene.
         image_instructions: Content of ``prompts/images/images.txt``.
         index: Segment index (zero-based).
-        anchor_text: Optional content of ``prompts/images/anchors.txt``.
-            When non-empty, inserted as a CONSISTENCY ANCHORS block.
+        anchor_text: Optional content of ``anchors.txt``.
+        shot_rules_text: Optional content of ``shot_rules.txt``.
+        negative_text: Optional content of ``negative.txt``.
 
     Returns:
         A formatted image generation prompt string.
@@ -194,7 +208,21 @@ def build_image_prompt(
     if anchor_text and anchor_text.strip():
         parts.append(f"CONSISTENCY ANCHORS:\n{anchor_text.strip()}")
 
+    if shot_rules_text and shot_rules_text.strip():
+        parts.append(f"SHOT RULES:\n{shot_rules_text.strip()}")
+
+    if negative_text and negative_text.strip():
+        parts.append(f"NEGATIVE CONSTRAINTS:\n{negative_text.strip()}")
+
     parts.append(f"CURRENT NARRATION SEGMENT:\nScene {index + 1}: {scene}")
+
+    parts.append(
+        "TASK:\n"
+        "Generate one detailed image prompt describing a single cinematic scene "
+        "that faithfully represents the narration segment above. "
+        "Follow all rules and constraints listed above. "
+        "Do not explain anything. Output the image prompt only."
+    )
 
     return "\n\n".join(parts)
 

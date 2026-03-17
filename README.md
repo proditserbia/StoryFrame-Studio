@@ -2,18 +2,22 @@
 
 A production-ready Python desktop application for content creators that generates AI-narrated videos from scripts. Built with Tkinter, FFmpeg, ElevenLabs/Deepgram for narration, and Replicate for image generation.
 
+StoryFrame Studio is **niche-neutral by design**. The application code, UI, and architecture are generic so the same app can be reused for horror stories, mystery narration, documentary voiceovers, educational content, or any other narrated YouTube format. All visual and thematic customisation lives in editable `.txt` files — no code changes required to retheme.
+
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Folder Structure](#folder-structure)
+- [Prompt File Architecture](#prompt-file-architecture)
 - [Setup](#setup)
 - [.env Configuration](#env-configuration)
 - [FFmpeg Installation](#ffmpeg-installation)
 - [Running the App](#running-the-app)
 - [Placing Scripts](#placing-scripts)
-- [Editing Image Instructions](#editing-image-instructions)
+- [Retheme for a New Niche](#retheme-for-a-new-niche)
+- [Prompt File Reference](#prompt-file-reference)
 - [Switching TTS Providers](#switching-tts-providers)
 - [How Rendering Works](#how-rendering-works)
 - [Future Extensions](#future-extensions)
@@ -54,7 +58,7 @@ StoryFrame-Studio/
 │   ├── models.py                 # Data classes
 │   ├── pipeline.py               # Main orchestration pipeline
 │   ├── ffmpeg_renderer.py        # FFmpeg rendering (Ken Burns, NVENC)
-│   └── utils.py                  # Script splitting, duration estimation
+│   └── utils.py                  # Script splitting, prompt building, helpers
 │
 ├── providers/
 │   ├── tts_base.py               # TTS provider interface
@@ -70,15 +74,76 @@ StoryFrame-Studio/
 │   └── worker.py                 # Background thread worker
 │
 ├── prompts/
-│   ├── images/
-│   │   └── images.txt            # Visual style instructions for image gen
-│   └── scripts/
-│       └── sample_story.txt      # Example narration script
+│   ├── images/                   # Default (generic) prompt files
+│   │   ├── images.txt            # ← required: global visual style rules
+│   │   └── anchors.txt           # ← optional: cross-scene consistency hints
+│   ├── scripts/
+│   │   └── sample_story.txt      # Example narration script
+│   └── presets/
+│       └── horror/               # Ready-to-use horror channel preset
+│           ├── images.txt        # Horror visual style
+│           ├── anchors.txt       # Horror consistency anchors
+│           ├── shot_rules.txt    # Horror camera / shot rules
+│           ├── negative.txt      # Horror negative constraints
+│           └── sample_story.txt  # Horror story example
 │
 └── projects/
     ├── output/                   # Final MP4 outputs (timestamped folders)
     └── temp/                     # Intermediate files (audio, raw images)
 ```
+
+---
+
+## Prompt File Architecture
+
+All visual and thematic adaptation happens through editable text files in the `prompts/` folder — not through code changes.
+
+### How prompt assembly works
+
+For each script segment, the app builds an image prompt by combining text-file blocks in this fixed order:
+
+```
+1. GLOBAL STYLE RULES      ← images.txt          (required)
+2. CONSISTENCY ANCHORS     ← anchors.txt          (optional)
+3. SHOT RULES              ← shot_rules.txt       (optional)
+4. NEGATIVE CONSTRAINTS    ← negative.txt         (optional)
+5. CURRENT NARRATION SEGMENT  ← the script text
+6. TASK                    ← built-in instruction
+```
+
+Optional files are discovered automatically in the **same directory** as the selected `images.txt`. If a file is absent, its block is silently skipped. The pipeline logs which files were loaded:
+
+```
+[Prompt] Loaded images.txt
+[Prompt] Loaded anchors.txt
+[Prompt] shot_rules.txt not found, skipping.
+[Prompt] negative.txt not found, skipping.
+```
+
+The final assembled prompt for every segment is saved in `metadata.json` under the `visual_plan` array so you can inspect and debug what was sent to the image model.
+
+### Switching niches
+
+To adapt the app to a new niche, point the **Image instructions** file picker at the `images.txt` inside a different preset folder. The app automatically loads all optional sibling files (`anchors.txt`, `shot_rules.txt`, `negative.txt`) from that same folder.
+
+**Example — switch to the horror preset:**
+
+1. Open StoryFrame Studio.
+2. Click **Browse…** next to *Image instructions*.
+3. Navigate to `prompts/presets/horror/` and select `images.txt`.
+4. The app loads all four horror files automatically.
+
+**Example — create your own preset:**
+
+```
+prompts/presets/my-documentary/
+├── images.txt        ← visual style (required)
+├── anchors.txt       ← consistency rules (optional)
+├── shot_rules.txt    ← camera rules (optional)
+└── negative.txt      ← exclusions (optional)
+```
+
+No code changes required. Just create the folder, write your text files, and select the `images.txt` in the UI.
 
 ---
 
@@ -125,6 +190,8 @@ cp .env.example .env
 | `ELEVENLABS_VOICE_ID` | — | ElevenLabs voice ID |
 | `DEEPGRAM_API_KEY` | — | Deepgram API key |
 | `DEEPGRAM_VOICE_MODEL` | `aura-asteria-en` | Deepgram Aura model name |
+| `TTS_LEADING_SILENCE_SECONDS` | `0.0` | Seconds of silence before narration starts |
+| `TTS_TRAILING_SILENCE_SECONDS` | `0.0` | Seconds of silence after narration ends |
 | `IMAGE_PROVIDER` | `replicate` | Image provider (`replicate`) |
 | `REPLICATE_API_TOKEN` | — | Replicate API token |
 | `REPLICATE_MODEL` | — | Replicate model ID (e.g. `stability-ai/sdxl:...`) |
@@ -186,26 +253,43 @@ Example structure:
 ```
 prompts/scripts/
 ├── sample_story.txt
-├── my_horror_episode_1.txt
+├── episode_01.txt
 └── documentary_intro.txt
 ```
 
 ---
 
-## Editing Image Instructions
+## Retheme for a New Niche
 
-Edit `prompts/images/images.txt` to define the visual style for image generation.
+StoryFrame Studio ships with:
 
-This file is combined with each script segment to build image prompts. Write it as a list of style directives:
+- `prompts/images/` — generic niche-neutral defaults (used out of the box)
+- `prompts/presets/horror/` — a ready-to-use horror channel preset
 
-```
-Cinematic photorealistic style.
-High-contrast dramatic lighting.
-No text overlays.
-Color palette: deep blues and warm ambers.
-```
+**To use the horror preset:**
+1. In the UI, click **Browse…** next to *Image instructions*.
+2. Navigate to `prompts/presets/horror/` and select `images.txt`.
+3. The four horror files (`images.txt`, `anchors.txt`, `shot_rules.txt`, `negative.txt`) are all loaded automatically.
 
-You can have different `images.txt` files for different projects — just select the correct one in the UI.
+**To create your own preset:**
+1. Create a new folder, e.g. `prompts/presets/mystery/`.
+2. Add your `images.txt` (required) and any optional files.
+3. Select that `images.txt` in the UI.
+
+No Python code changes are ever needed to retheme.
+
+---
+
+## Prompt File Reference
+
+| File | Required | Purpose |
+|---|---|---|
+| `images.txt` | **Yes** | Global visual style rules; defines the look and mood of every generated image |
+| `anchors.txt` | No | Cross-scene consistency anchors; keeps lighting, colour, and character depiction uniform |
+| `shot_rules.txt` | No | Camera and composition rules; controls framing, angle, and shot type priorities |
+| `negative.txt` | No | Hard exclusions passed to the image model to suppress unwanted content |
+
+All optional files are auto-discovered from the **same directory** as the selected `images.txt`. Missing files are logged and skipped gracefully.
 
 ---
 
@@ -230,14 +314,14 @@ Make sure the corresponding API keys are filled in `.env`.
 
 ## How Rendering Works
 
-1. **Script segmentation** — The script is split into segments (by paragraph/sentence).
+1. **Script segmentation** — The script is split into segments (by paragraph/sentence boundary).
 2. **TTS narration** — The full script text is sent to the selected TTS provider; a single MP3 is returned.
-3. **Image prompts** — Each segment is combined with your `images.txt` style instructions to build one image prompt per segment.
+3. **Prompt assembly** — For each segment, the app builds one image prompt by combining the loaded text-file blocks (style rules, anchors, shot rules, negatives) with the narration text.
 4. **Image generation** — Each prompt is sent to Replicate; images are saved locally.
 5. **Video clips** — FFmpeg generates a short video clip from each image, with a Ken Burns zoom/pan effect.
 6. **Concatenation** — Clips are joined with optional crossfade transitions.
 7. **Audio merge** — The narration audio is merged into the video and the result is trimmed to audio length.
-8. **Output** — Final MP4 plus `metadata.json` are saved in `projects/output/<timestamp>/`.
+8. **Output** — Final MP4 plus `metadata.json` (including all assembled prompts) are saved in `projects/output/<timestamp>/`.
 
 ### NVENC (GPU acceleration)
 If `USE_NVENC_AUTO=true` and an NVIDIA GPU with NVENC is available, the encoder switches to `h264_nvenc` automatically. Otherwise `libx264` (software) is used.
@@ -253,6 +337,7 @@ The codebase is designed for easy extension:
 | New TTS provider | Subclass `providers/tts_base.py` |
 | New image provider | Subclass `providers/image_base.py` |
 | AI video provider (Runway, Pika) | Subclass `providers/video_base.py` |
+| New niche preset | Add a folder under `prompts/presets/` with text files |
 | LLM prompt rewriting | Add a rewriter step in `core/pipeline.py` between segmentation and image gen |
 | Additional UI settings | Extend `ui/main_window.py` controls frame |
 | New output format | Extend `core/ffmpeg_renderer.py` |

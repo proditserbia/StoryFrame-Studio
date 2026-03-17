@@ -1,0 +1,27 @@
+# Negative Constraints — Horror Preset
+# ─────────────────────────────────────────────────────────────────────────────
+# Horror-specific hard exclusions for StoryFrame Studio image generation.
+# Loaded automatically when this file is present alongside images.txt in the
+# same preset folder.
+# ─────────────────────────────────────────────────────────────────────────────
+
+no text
+no subtitles
+no logos
+no watermarks
+no cartoon style
+no illustration style
+no anime style
+no distorted faces
+no extra people not mentioned in narration
+no close-up portraits
+no headshots
+no tight face crops
+no generic stock-photo horror (no random skulls, bleeding walls, or cliché
+jump-scare imagery unless grounded in the narration)
+no bright, cheerful, or well-lit scenes unless the narration explicitly
+describes such a setting
+no over-the-top gore unless the narration explicitly describes it
+no supernatural visual effects (glowing eyes, ghostly auras) unless the
+narration explicitly describes them
+no modern digital UI elements, screens showing menus, or HUD overlays
