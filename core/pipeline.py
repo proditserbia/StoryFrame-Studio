@@ -25,6 +25,7 @@ from core.ffmpeg_renderer import FFmpegRenderer
 from core.logger import AppLogger
 from core.models import ImageResult, RunMetadata, VisualSegment, TTSResult
 from core.utils import (
+    append_silence,
     build_image_prompt,
     create_visual_plan,
     ensure_dir,
@@ -161,6 +162,26 @@ class Pipeline:
         image_instructions = self._load_text(
             image_instructions_path, "image instructions"
         )
+
+        # Load optional anchors.txt from the same directory as images.txt
+        anchor_text = ""
+        anchors_path = image_instructions_path.parent / "anchors.txt"
+        if anchors_path.exists():
+            self._logger.info(
+                "[Anchors] Found anchors.txt at %s — loading consistency anchors.",
+                anchors_path,
+            )
+            try:
+                anchor_text = anchors_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                self._logger.warning(
+                    "[Anchors] Could not read anchors.txt: %s", exc
+                )
+        else:
+            self._logger.info(
+                "[Anchors] No anchors.txt found at %s — skipping consistency anchors.",
+                anchors_path,
+            )
         self._check_cancel()
 
         # 3 -- Segment script and create visual plan
@@ -193,7 +214,7 @@ class Pipeline:
         # 4 -- Build image prompts (segment-specific, based on narration text)
         for seg in visual_plan:
             seg.image_prompt = build_image_prompt(
-                seg.text, image_instructions, seg.index
+                seg.text, image_instructions, seg.index, anchor_text=anchor_text
             )
             self._logger.info(
                 "[Prompt %02d] Generated image prompt based on segment text",
@@ -241,6 +262,35 @@ class Pipeline:
             else:
                 self._logger.warning(
                     "[TTS] Failed to prepend silence; using original audio."
+                )
+
+        # Append configurable trailing silence so narration does not end
+        # abruptly before the video finishes.
+        trailing_silence = self._config.tts_trailing_silence
+        if trailing_silence > 0:
+            self._logger.info(
+                "[TTS] Appending %.2fs of silence after narration.",
+                trailing_silence,
+            )
+            trailing_path = temp_dir / "narration_with_trailing_silence.mp3"
+            if append_silence(
+                self._config.ffmpeg_path,
+                tts_result.audio_path,
+                trailing_silence,
+                trailing_path,
+            ):
+                tts_result = TTSResult(
+                    audio_path=trailing_path,
+                    provider=tts_result.provider,
+                    metadata=tts_result.metadata,
+                )
+                self._logger.info(
+                    "[TTS] Trailing silence appended successfully. Audio: %s",
+                    trailing_path,
+                )
+            else:
+                self._logger.warning(
+                    "[TTS] Failed to append trailing silence; using audio without it."
                 )
 
         # Refine timing: if actual audio duration is available, scale segment

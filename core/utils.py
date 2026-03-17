@@ -159,32 +159,88 @@ def estimate_duration(text: str, words_per_minute: int = 130) -> float:
 
 
 def build_image_prompt(
-    segment_text: str, image_instructions: str, index: int
+    segment_text: str,
+    image_instructions: str,
+    index: int,
+    anchor_text: str = "",
 ) -> str:
-    """Combine segment text and image style instructions into an image prompt.
+    """Combine segment text, style instructions, and optional anchors into an image prompt.
 
     The global style rules from ``prompts/images/images.txt`` are placed as a
     strong directive block at the top of the prompt so that the image model
     treats them as mandatory constraints rather than optional trailing context.
-    The scene description follows, grounded in the actual narration text.
+    Optional consistency anchors from ``prompts/images/anchors.txt`` follow,
+    providing cross-scene visual continuity hints.  The scene description
+    grounds the prompt in the actual narration text.
 
     Args:
         segment_text: Text of the narration segment for this scene.
         image_instructions: Content of ``prompts/images/images.txt``.
         index: Segment index (zero-based).
+        anchor_text: Optional content of ``prompts/images/anchors.txt``.
+            When non-empty, inserted as a CONSISTENCY ANCHORS block.
 
     Returns:
         A formatted image generation prompt string.
     """
     instructions = image_instructions.strip()
     scene = segment_text.strip().replace("\n", " ")
-    prompt = (
-        f"Follow these visual rules strictly.\n\n"
-        f"GLOBAL STYLE RULES:\n{instructions}\n\n"
-        f"SCENE TO RENDER:\n"
-        f"Scene {index + 1}: {scene}"
-    )
-    return prompt
+
+    parts: list[str] = [
+        "Follow these visual rules strictly.",
+        f"GLOBAL STYLE RULES:\n{instructions}",
+    ]
+
+    if anchor_text and anchor_text.strip():
+        parts.append(f"CONSISTENCY ANCHORS:\n{anchor_text.strip()}")
+
+    parts.append(f"CURRENT NARRATION SEGMENT:\nScene {index + 1}: {scene}")
+
+    return "\n\n".join(parts)
+
+
+def append_silence(
+    ffmpeg_path: str,
+    audio_path: Path,
+    silence_seconds: float,
+    output_path: Path,
+) -> bool:
+    """Append a period of silence to an audio file using FFmpeg.
+
+    Uses the ``apad`` filter to extend the audio with silence for the
+    requested duration, effectively inserting silence at the end.
+
+    Args:
+        ffmpeg_path: Path or name of the ffmpeg executable.
+        audio_path: Source audio file.
+        silence_seconds: Duration of silence to append in seconds.
+        output_path: Destination audio file path.
+
+    Returns:
+        True on success, False on error.
+    """
+    if silence_seconds <= 0:
+        shutil.copy(audio_path, output_path)
+        return True
+
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",
+                "-i", str(audio_path),
+                "-af", f"apad=pad_dur={silence_seconds:.3f}",
+                "-c:a", "libmp3lame",
+                "-q:a", "2",
+                str(output_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def ensure_dir(path: Path) -> Path:

@@ -150,6 +150,40 @@ class MainWindow:
             width=24,
         ).grid(row=4, column=1, sticky=tk.W, **pad)
 
+        # Leading silence
+        ttk.Label(ctrl, text="Leading silence (s):").grid(
+            row=5, column=0, sticky=tk.W, **pad
+        )
+        self._leading_silence_var = StringVar(
+            value=str(self._config.tts_leading_silence)
+        )
+        ttk.Spinbox(
+            ctrl,
+            textvariable=self._leading_silence_var,
+            from_=0.0,
+            to=10.0,
+            increment=0.5,
+            width=8,
+            format="%.1f",
+        ).grid(row=5, column=1, sticky=tk.W, **pad)
+
+        # Trailing silence
+        ttk.Label(ctrl, text="Trailing silence (s):").grid(
+            row=6, column=0, sticky=tk.W, **pad
+        )
+        self._trailing_silence_var = StringVar(
+            value=str(self._config.tts_trailing_silence)
+        )
+        ttk.Spinbox(
+            ctrl,
+            textvariable=self._trailing_silence_var,
+            from_=0.0,
+            to=10.0,
+            increment=0.5,
+            width=8,
+            format="%.1f",
+        ).grid(row=6, column=1, sticky=tk.W, **pad)
+
         # ── Action buttons ─────────────────────────────────────────────
         btn_frame = ttk.Frame(self._root)
         btn_frame.pack(fill=tk.X, padx=12, pady=4)
@@ -270,6 +304,28 @@ class MainWindow:
         # Resolve segmentation density
         density_label = self._density_var.get()
         density = _DENSITY_OPTIONS.get(density_label, "balanced")
+
+        # Apply silence settings to config
+        try:
+            self._config.tts_leading_silence = max(
+                0.0, float(self._leading_silence_var.get())
+            )
+        except ValueError:
+            self._config.tts_leading_silence = 0.0
+            messagebox.showwarning(
+                "Invalid value",
+                "Leading silence must be a number. Defaulting to 0.0 s.",
+            )
+        try:
+            self._config.tts_trailing_silence = max(
+                0.0, float(self._trailing_silence_var.get())
+            )
+        except ValueError:
+            self._config.tts_trailing_silence = 0.0
+            messagebox.showwarning(
+                "Invalid value",
+                "Trailing silence must be a number. Defaulting to 0.0 s.",
+            )
 
         # Disable Start, enable Cancel
         self._start_btn.config(state=tk.DISABLED)

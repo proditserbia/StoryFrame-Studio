@@ -19,14 +19,24 @@ Your task is to convert a narration segment into ONE photorealistic cinematic sc
 
 The image must feel like a frame from a psychological horror film.
 
+FRAMING — CRITICAL RULE
+
+ALWAYS default to ENVIRONMENT-FIRST framing.
+
+Generate rooms, hallways, house exteriors, staircases, attic spaces, basement corridors, objects, architectural details, and environmental tension UNLESS the narration explicitly and primarily describes a person's face or close-up action.
+
+DO NOT generate close-up human portraits, face close-ups, or tight headshots unless the narration is specifically about a person's face, reaction, or expression.
+
+When a person appears in the scene, place them as a small or mid-distance figure within the larger environment — never as the dominant subject filling the frame.
+
 SCENE MATCHING
 
-The image must directly reflect the narration segment.  
+The image must directly reflect the narration segment.
 Focus on the key environment or action described in the text.
 
 Avoid inventing unrelated elements.
 
-If the narration describes a location or object, the scene should focus on that.
+If the narration describes a location or object, the scene should focus on that location or object — not a person observing it.
 
 ENVIRONMENT CONSISTENCY
 
@@ -38,36 +48,36 @@ Do not change architecture, layout, or major environmental elements unless the n
 
 VISUAL STYLE
 
-photorealistic cinematic horror  
-psychological tension  
-moody lighting  
-deep shadows  
-realistic environments  
-subtle unsettling atmosphere  
+photorealistic cinematic horror
+psychological tension
+moody lighting
+deep shadows
+realistic environments
+subtle unsettling atmosphere
 
 Prefer environmental storytelling rather than monsters or gore.
 
 CAMERA STYLE
 
-cinematic film still  
-wide or medium shots  
-35mm film look  
-shallow depth of field  
-subject slightly off-center  
+cinematic film still
+wide or medium shots — NEVER close-up portrait
+35mm film look
+shallow depth of field
+subject slightly off-center
 
 Scenes must work well for slow Ken Burns zoom and pan motion.
 
 LIGHTING
 
-low light environments  
-warm interior lamps or cold moonlight  
-strong shadow contrast  
-dark corners and hallways  
+low light environments
+warm interior lamps or cold moonlight
+strong shadow contrast
+dark corners and hallways
 
 RESOLUTION AND COMPOSITION
 
-Landscape cinematic framing  
-16:9 aspect ratio  
+Landscape cinematic framing
+16:9 aspect ratio
 
 Images should be composed for a 1920x1080 video frame.
 
@@ -78,14 +88,17 @@ Preferred generation resolution:
 
 NEGATIVE CONSTRAINTS
 
-no text  
-no subtitles  
-no logos  
-no watermarks  
-no cartoon style  
-no illustration style  
-no distorted faces  
+no text
+no subtitles
+no logos
+no watermarks
+no cartoon style
+no illustration style
+no distorted faces
 no extra people not mentioned in narration
+no close-up portraits
+no headshots
+no tight face crops
 
 OUTPUT FORMAT
 

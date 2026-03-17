@@ -1,0 +1,35 @@
+# Consistency Anchors
+# ─────────────────────────────────────────────────────────────────────────────
+# This file defines visual anchors that are injected into every image prompt
+# to keep key elements consistent across all generated scenes.
+#
+# Use this file to lock down the appearance of recurring environments,
+# characters, objects, and architectural details so that scenes feel like
+# they belong to the same visual world.
+#
+# Examples of what to anchor:
+#  - The house exterior (Victorian two-storey, red brick, overgrown garden)
+#  - A recurring room (attic with bare floorboards, single hanging bulb)
+#  - A character's silhouette or clothing (tall, dark coat, never shown clearly)
+#  - Consistent colour palette (desaturated blue-grey with amber practical lights)
+#  - A specific object (old wooden chest in the corner of the basement)
+#
+# Keep entries concise — one or two descriptive lines per anchor.
+# Remove or comment out any anchor that does not apply to your project.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- House ---
+# A detached two-storey Victorian house. Dark red brick exterior, sash windows,
+# overgrown front garden, broken iron gate. Feels abandoned but recently lived-in.
+
+# --- Interior atmosphere ---
+# Interiors are dimly lit with single practical light sources (hanging bulbs,
+# table lamps). Walls are papered in faded floral patterns. Wooden floorboards.
+
+# --- Colour palette ---
+# Desaturated blue-grey shadows with warm amber practical lights.
+# Deep blacks in corners and doorways. No bright colours.
+
+# --- Character silhouette ---
+# When a person appears, show only a distant silhouette or partial figure.
+# Never a clear face. Tall, slight build, dark clothing.
