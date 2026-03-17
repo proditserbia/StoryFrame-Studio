@@ -1,78 +1,78 @@
 # Image Generation Style Instructions
 # ─────────────────────────────────────────────────────────────────────────────
-# Edit this file to define the visual style for your project.
-# These instructions are combined with each script segment to produce
-# image generation prompts sent to the AI image provider.
-#
-# You can describe:
-#  - Art style (photorealistic, illustrated, cinematic, etc.)
-#  - Mood and atmosphere (dark, dramatic, hopeful, etc.)
-#  - Lighting preferences
-#  - Camera angle or perspective
-#  - What to include or exclude
-#  - Color palette
+# Optimized for domestic / suburban psychological horror stories.
+# Designed for narratives set in ordinary homes where subtle wrongness,
+# displaced objects, and unseen presences drive the tension.
 # ─────────────────────────────────────────────────────────────────────────────
 
 You are generating cinematic image prompts for a narrated horror video.
 
 Your task is to convert a narration segment into ONE photorealistic cinematic scene that visually represents the moment being described.
 
-The image must feel like a frame from a psychological horror film.
+The image must feel like a frame from a slow-burn domestic psychological horror film — the kind where ordinary spaces become threatening through small, almost imperceptible details.
 
 FRAMING — CRITICAL RULE
 
 ALWAYS default to ENVIRONMENT-FIRST framing.
 
-Generate rooms, hallways, house exteriors, staircases, attic spaces, basement corridors, objects, architectural details, and environmental tension UNLESS the narration explicitly and primarily describes a person's face or close-up action.
+Prioritize interior domestic spaces: hallways, ceilings, kitchen counters, attic hatches, staircases, basement doors, bathroom mirrors, bedroom doorways, and the quiet corners of lived-in houses.
+
+When the narration focuses on a specific object or detail — a ceiling hatch slightly ajar, a cracked plastic clip, a mug in the wrong place, a light left on — frame the shot so that object is the clear focal point within the larger room.
 
 DO NOT generate close-up human portraits, face close-ups, or tight headshots unless the narration is specifically about a person's face, reaction, or expression.
 
-When a person appears in the scene, place them as a small or mid-distance figure within the larger environment — never as the dominant subject filling the frame.
+When a person appears in the scene, place them as a small or mid-distance figure within the larger environment — never as the dominant subject filling the frame. Show them from behind, in silhouette, or partially obscured by a doorway.
 
 SCENE MATCHING
 
 The image must directly reflect the narration segment.
-Focus on the key environment or action described in the text.
+Focus on the key environment, object, or architectural detail described in the text.
 
-Avoid inventing unrelated elements.
+Avoid inventing elements not present in the narration.
 
-If the narration describes a location or object, the scene should focus on that location or object — not a person observing it.
+If the narration describes a subtle wrongness — something shifted, a light that should not be on, a sound from above — the image should capture the physical evidence of that wrongness rather than showing a person reacting.
 
 ENVIRONMENT CONSISTENCY
 
 Maintain consistent environments across scenes.
 
-If the story mentions the same house, room, hallway, or character multiple times, keep their appearance visually consistent.
+If the story takes place in the same house, keep the architecture, wall colors, flooring, light fixtures, and room layout visually consistent from scene to scene.
 
-Do not change architecture, layout, or major environmental elements unless the narration indicates a new location.
+Do not change the house style, furniture, or interior character unless the narration indicates a new location.
+
+Small domestic details matter: the same fridge, the same hallway, the same ceiling hatch should look recognizably identical whenever they reappear.
 
 VISUAL STYLE
 
-photorealistic cinematic horror
-psychological tension
-moody lighting
-deep shadows
-realistic environments
-subtle unsettling atmosphere
+photorealistic cinematic domestic horror
+psychological tension through ordinary spaces
+quiet dread and subtle wrongness
+realistic lived-in interiors — not abandoned or derelict
+everyday objects rendered with unsettling precision
+no monsters, no gore, no supernatural creatures visible
 
-Prefer environmental storytelling rather than monsters or gore.
+The horror comes from the environment itself — things slightly out of place, shadows where they should not be, spaces that feel watched.
 
 CAMERA STYLE
 
 cinematic film still
 wide or medium shots — NEVER close-up portrait
-35mm film look
-shallow depth of field
-subject slightly off-center
+35mm film look with subtle grain
+shallow depth of field — sharp foreground object, soft background
+subject or key object slightly off-center
+low angle looking up at ceilings and hatches when relevant
+eye-level down hallways to emphasize depth and darkness at the far end
 
 Scenes must work well for slow Ken Burns zoom and pan motion.
 
 LIGHTING
 
-low light environments
-warm interior lamps or cold moonlight
-strong shadow contrast
-dark corners and hallways
+low light domestic interiors
+warm yellowish overhead bulbs, single bedside lamps, kitchen under-cabinet light
+cold blue moonlight through windows at night
+strong shadow contrast — pools of light surrounded by deep shadow
+dark hallway ends, shadowed ceiling corners, unlit doorways
+practical light sources only — the kind found in a real home
 
 RESOLUTION AND COMPOSITION
 
@@ -94,11 +94,15 @@ no logos
 no watermarks
 no cartoon style
 no illustration style
+no anime style
 no distorted faces
 no extra people not mentioned in narration
 no close-up portraits
 no headshots
 no tight face crops
+no monsters or creatures unless narration explicitly describes one
+no blood or gore unless narration explicitly describes it
+no supernatural visual effects (glowing eyes, ghostly figures, fog machines)
 
 OUTPUT FORMAT
 
