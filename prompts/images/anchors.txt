@@ -20,12 +20,12 @@ overwhelming darkness. When transitioning between scenes, lighting mood
 should remain cohesive unless the narration explicitly shifts setting
 or time of day.
 
-# --- Colour grading ---
-Apply a consistent cold, desaturated colour grade across all scenes.
+# --- Color grading ---
+Apply a consistent cold, desaturated color grade across all scenes.
 Deep blacks, steely blues, muted greens, and ashen grays form the base
 palette. Warm tones appear only from diegetic sources (fire, old bulbs,
 candles) and should feel isolated against the cold surroundings. This
-colour language must remain uniform across the entire story.
+color language must remain uniform across the entire story.
 
 # --- Environmental texture ---
 Surfaces and environments should show texture and imperfection: grain in

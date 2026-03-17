@@ -79,7 +79,7 @@ volumetric light through fog, dust, or haze when appropriate
 practical light sources that match the story setting
 darkness as a compositional element — large areas of deep black that suggest hidden threats
 
-COLOUR PALETTE
+COLOR PALETTE
 
 desaturated and cold by default
 deep blacks, dark blues, muted greens, ashen grays
