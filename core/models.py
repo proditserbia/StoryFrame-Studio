@@ -53,6 +53,8 @@ class VisualSegment:
     image_prompt: str = ""
     transition_hint: str = ""
     emphasis_keyword: str = ""
+    scene_focus: str = "environment"
+    shot_type: str = "wide"
 
     def to_dict(self) -> dict:
         """Serialise to a plain dict suitable for JSON output."""
@@ -65,6 +67,8 @@ class VisualSegment:
             "image_prompt": self.image_prompt,
             "transition_hint": self.transition_hint,
             "emphasis_keyword": self.emphasis_keyword,
+            "scene_focus": self.scene_focus,
+            "shot_type": self.shot_type,
         }
 
 
