@@ -1,35 +1,47 @@
 # Consistency Anchors
 # ─────────────────────────────────────────────────────────────────────────────
-# This file defines visual anchors that are injected into every image prompt
-# to keep key elements consistent across all generated scenes.
-#
-# Use this file to lock down the appearance of recurring environments,
-# characters, objects, and architectural details so that scenes feel like
-# they belong to the same visual world.
-#
-# Examples of what to anchor:
-#  - The house exterior (Victorian two-storey, red brick, overgrown garden)
-#  - A recurring room (attic with bare floorboards, single hanging bulb)
-#  - A character's silhouette or clothing (tall, dark coat, never shown clearly)
-#  - Consistent colour palette (desaturated blue-grey with amber practical lights)
-#  - A specific object (old wooden chest in the corner of the basement)
-#
-# Keep entries concise — one or two descriptive lines per anchor.
-# Remove or comment out any anchor that does not apply to your project.
+# Visual anchors for domestic suburban horror stories.
+# These are injected into every image prompt to keep recurring environments,
+# objects, and characters visually consistent across all generated scenes.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# --- House ---
-# A detached two-storey Victorian house. Dark red brick exterior, sash windows,
-# overgrown front garden, broken iron gate. Feels abandoned but recently lived-in.
+# --- House exterior ---
+A small, modest single-storey house painted pale blue with white trim.
+Sits on a quiet residential corner lot. Slightly worn and weathered but
+not abandoned — a recently occupied home. Small front yard, simple porch,
+ordinary suburban neighborhood. Overcast sky or dusk lighting.
 
-# --- Interior atmosphere ---
-# Interiors are dimly lit with single practical light sources (hanging bulbs,
-# table lamps). Walls are papered in faded floral patterns. Wooden floorboards.
+# --- Interior — general ---
+Interiors are modest and lived-in: plain painted walls, basic furniture,
+low ceilings. Not a grand or stylish home — the kind of small affordable
+house you move into after a breakup. Slightly dated kitchen, narrow hallway,
+compact rooms. Everything is real and ordinary, which makes wrongness
+more unsettling.
+
+# --- Hallway and attic hatch ---
+A narrow interior hallway with a low ceiling. In the ceiling is a square
+plywood attic hatch set into a plain frame, with a short pull-string
+dangling from it. The hatch should look flush when closed, but when
+displaced, a thin line of shadow is visible along one edge where it has
+been nudged from above. This is the central horror element — keep its
+appearance identical in every scene where it appears.
+
+# --- Kitchen ---
+A modest galley-style kitchen with an older white refrigerator, laminate
+countertops, and basic cabinetry. A squeaky floorboard near the entrance.
+Overhead fluorescent or single-bulb lighting. Personal items like a coffee
+mug and phone charger on the counter.
 
 # --- Colour palette ---
-# Desaturated blue-grey shadows with warm amber practical lights.
-# Deep blacks in corners and doorways. No bright colours.
+Muted, desaturated tones: faded blues, warm yellows from household bulbs,
+grey-blue shadows at night. Deep blacks in hallway ends and ceiling corners.
+No bright or saturated colors. Daytime scenes are overcast and flat.
+Nighttime scenes are lit only by practical household sources — a bedside
+lamp, a hallway bulb, moonlight through blinds.
 
-# --- Character silhouette ---
-# When a person appears, show only a distant silhouette or partial figure.
-# Never a clear face. Tall, slight build, dark clothing.
+# --- Character ---
+When the main character appears, show them as a mid-distance or partial
+figure — seen from behind, standing in a doorway, or as a silhouette
+at the end of a hallway. Average build, casual home clothing. Never show
+a clear face. Convey isolation and vulnerability through body language
+and scale within the larger domestic space.
